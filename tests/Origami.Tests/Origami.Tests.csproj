@@ -30,6 +30,12 @@
     <ProjectReference Include="..\..\src\Origami.Desktop\Origami.Desktop.csproj" />
   </ItemGroup>
 
+  <!-- 旧参考实现（JavaScript）导出的字库与折痕，用于算法一致性核对。
+       由 Node 直接运行旧的 strip.js 导出，不含手工转录。 -->
+  <ItemGroup>
+    <None Include="legacy_font.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <!-- 权威题面基准（方形 CP 折痕图），作为回归测试的黄金样本 -->
   <ItemGroup>
     <None Include="square_truth.svg" CopyToOutputDirectory="PreserveNewest" />
