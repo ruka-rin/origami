@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Avalonia.Threading;
 using Origami.Core;
 
 namespace Origami.Desktop;
@@ -100,8 +101,18 @@ public sealed class MainViewModel : Observable
         set
         {
             if (!Set(ref _isTextMode, value)) return;
-            // 刚打开时直接聚焦，用户不用再点一下输入框
-            if (value) TextBoxRequested?.Invoke();
+
+            if (!value)
+            {
+                // 关掉开关后别再自动生成 —— 母版框已经是唯一来源了
+                _generateTimer?.Stop();
+                return;
+            }
+
+            // 刚打开时直接聚焦，用户不用再点一下输入框；
+            // 框里已有内容则立刻生成一次，让画布与文本对得上
+            TextBoxRequested?.Invoke();
+            if (!string.IsNullOrWhiteSpace(TextInput)) ScheduleGenerate();
         }
     }
 
@@ -109,12 +120,49 @@ public sealed class MainViewModel : Observable
     public Action? TextBoxRequested { get; set; }
 
     string _textInput = "";
-    /// <summary>文本输入框的内容（普通文本，如 <c>KRENIO</c>）。</summary>
+    /// <summary>文本输入框的内容（普通文本，如<code>KRENIO</code>，可分行）。</summary>
     public string TextInput
     {
         get => _textInput;
-        set => Set(ref _textInput, value);
+        set
+        {
+            if (!Set(ref _textInput, value)) return;
+            if (IsTextMode) ScheduleGenerate();
+        }
     }
+
+    /// <summary>
+    /// 文本改动后<b>自动生成母版</b>，用防抖合并连打。
+    /// <para>
+    /// 文本框是多行的（分行折蛇形），回车必须留给换行，失焦也不可靠
+    /// —— 用户可能打完就不点别处、一直看着画布。所以改成边打边出：
+    /// 设一个短延时，把连打过程合并成一次生成。
+    /// </para>
+    /// </summary>
+    void ScheduleGenerate()
+    {
+        var timer = _generateTimer;
+        if (timer is null)
+        {
+            var created = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(220),
+            };
+            created.Tick += async (_, _) =>
+            {
+                created.Stop();
+                if (!IsTextMode) return;
+                await GenerateFromTextAsync();
+            };
+            _generateTimer = created;
+            timer = created;
+        }
+
+        timer.Stop();
+        timer.Start();
+    }
+
+    DispatcherTimer? _generateTimer;
 
     /// <summary>文本输入框的水印提示。</summary>
     public const string TextWatermark = "普通文本，可分行（字库支持 A-Z 0-9 与空格）";
