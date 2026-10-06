@@ -13,8 +13,8 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
-        // ★ 不要自己写 InitializeComponent() —— XAML 编译器生成的同名方法还负责
-        //   把 x:Name 声明的控件字段赋值上，手写一个同名方法会覆盖掉它。
+        // 不要自己写 InitializeComponent() —— XAML 编译器生成的同名方法还负责
+        // 把 x:Name 声明的控件字段赋值上，手写一个同名方法会覆盖掉它
         InitializeComponent();
         DataContext = _vm;
 
@@ -62,7 +62,7 @@ public partial class MainWindow : Window
 
     async Task RebuildAsync()
     {
-        // ★ 先设取景模式再触发：Source 一变，Viewer 会按当前 DefaultFit 复位
+        // 先设取景模式再触发：Source 一变，Viewer 会按当前 DefaultFit 复位
         if (_vm.SelectedTab is { } t) Viewer.DefaultFit = EffectiveFit(t);
         await _vm.RebuildAsync();
     }
@@ -70,21 +70,17 @@ public partial class MainWindow : Window
     /// <summary>
     /// 点击母版输入框<b>以外</b>的任何地方都让它失焦，从而触发自动渲染。
     /// <para>
-    /// ★ Avalonia 的 TextBox 不会因为点击别处自动失焦 —— 焦点只在「可聚焦控件之间
-    /// 移动」时转移，而画布、说明文字这些非可聚焦元素既拿不到焦点也不会让出焦点。
-    /// 结果是：改完母版点一下画布，焦点还留在输入框里，回车才生效，很别扭。
-    /// </para>
-    /// <para>
-    /// 判据用「按下的位置是否落在输入框内」，而不是无条件清除 ——
-    /// 无条件清除会连按钮、列表的键盘焦点一起干掉，影响 Tab 导航。
+    /// Avalonia 的 TextBox 不会因为点击别处自动失焦 —— 焦点只在「可聚焦控件之间移动」时转移，
+    /// 画布、说明文字这些非可聚焦元素既拿不到焦点也不会让出焦点。
+    /// 判据用「按下的位置是否落在输入框内」而不是无条件清除：后者会连按钮、列表的
+    /// 键盘焦点一起干掉，影响 Tab 导航。
     /// </para>
     /// </summary>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
 
-        // ★ 两个输入框：母版框常驻，文本框只在开关打开时存在。
-        //   谁在显示就保护谁，另一个被隐藏的不能算。
+        // 两个输入框：母版框常驻，文本框只在开关打开时存在，谁在显示就保护谁
         var inputs = _vm.IsTextMode
             ? new[] { MasterBox, TextBox }
             : new[] { MasterBox };
@@ -118,10 +114,9 @@ public partial class MainWindow : Window
     /// <summary>
     /// 结合<b>当前方向</b>算出实际取景方式。
     /// <para>
-    /// ★ 长条折痕图声明的是「铺满宽度」（100 格 × 1 格，横向铺满才看得清折痕端点）。
-    ///   但转过 90° 之后它就变成 1 格 × 100 格的<b>竖条</b>了 —— 此时再「铺满宽度」，
-    ///   整张图会被压成宽度接近 0 的一条线，完全看不见。
-    ///   所以奇数次旋转时退回「适应窗口」。</para>
+    /// 长条折痕图声明的是「铺满宽度」（100 格 × 1 格，横向铺满才看得清折痕端点），
+    /// 但转过 90° 之后它就变成 1 格 × 100 格的<b>竖条</b>了 —— 此时再铺满宽度，
+    /// 整张图会被压成宽度接近 0 的一条线。所以奇数次旋转时退回「适应窗口」。</para>
     /// </summary>
     FitMode EffectiveFit(ViewTab tab)
     {
@@ -135,7 +130,7 @@ public partial class MainWindow : Window
         if (e.AddedItems.Count == 0) return;
         if (e.AddedItems[0] is not ViewTab tab) return;
 
-        // ★ 顺序很重要：先定取景模式，再让 VM 换图（换图会触发复位）
+        // 顺序很重要：先定取景模式，再让 VM 换图（换图会触发复位）
         Viewer.DefaultFit = EffectiveFit(tab);
         await _vm.SelectViewAsync(tab);
     }
@@ -187,7 +182,6 @@ public partial class MainWindow : Window
         }
 
         // 先问格式 / 配色 / 分辨率，再问存到哪 —— 参数多，先在一个对话框里定下来
-        // 1× 基准尺寸 = 当前 SVG 的 viewBox，用户坐标即 1× 时的像素
         var box = Viewer.DocumentBox;
         var dialog = new ExportDialog(tab, _vm.Color, box);
         var opt = await dialog.ShowDialog<ExportOptions?>(this);
@@ -221,9 +215,9 @@ public partial class MainWindow : Window
 
     // ------------------------------------------------------------ 画布方向
 
-    // ★ 这四个按钮只改视图模型的 Xform，**导出对话框里不再问方向**：
-    //   导出直接继承画布当前状态（见 MainViewModel.Export）。
-    //   少一个选项就少一种「屏上这样、存出来那样」的可能。
+    // 这四个按钮只改视图模型的 Xform，**导出对话框里不再问方向**：
+    // 导出直接继承画布当前状态（见 MainViewModel.Export）——
+    // 少一个选项就少一种「屏上这样、存出来那样」的可能。
 
     void OnRotateCw(object? sender, RoutedEventArgs e) => _vm.RotateCw();
 

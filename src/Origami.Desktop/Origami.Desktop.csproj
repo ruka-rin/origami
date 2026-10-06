@@ -13,10 +13,8 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
   </PropertyGroup>
 
-  <!--
-    ★ 这里<b>没有</b> NoWarn 抑制 AVLN3001：之前是靠压制警告绕过去的，
-    正确的做法是给 ExportDialog 加无参构造（设计器也需要它），警告自然消失。
-  -->
+  <!-- 这里刻意不加 NoWarn 抑制 AVLN3001：ExportDialog 已有无参构造（设计器也需要它），
+       警告自然消失，不需要压制。 -->
 
   <ItemGroup>
     <AvaloniaResource Include="Assets/**" />
@@ -33,13 +31,9 @@
     <ProjectReference Include="..\Origami.Core\Origami.Core.csproj" />
   </ItemGroup>
 
-  <!--
-    ★ 让测试能看见 SvgNode 的具体类型（SvgRect / SvgLine / SvgPolygon）。
-      这些类型刻意是 internal —— 它们是预览渲染的实现细节，不是对外 API。
-      但「方向变换有没有真的作用到图元坐标上」这件事，只能从类型内部观察
-      （比对 X/Y/Width/Height），把它们改成 public 就为了测试并不划算，
-      所以这里开一个测试可见性，而不是放宽API。
-  -->
+  <!-- 让测试看见 SvgNode 的具体类型（internal，因为它们是预览渲染的实现细节）。
+       「方向变换是否真的作用到图元坐标上」只能从类型内部观察，
+       为此放宽成public 不划算，故开测试可见性。 -->
   <ItemGroup>
     <InternalsVisibleTo Include="Origami.Tests" />
   </ItemGroup>

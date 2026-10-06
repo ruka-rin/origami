@@ -6,10 +6,8 @@ using Origami.Core;
 namespace Origami.Desktop;
 
 /// <summary>
-/// 轻量 MVVM 支撑：属性变更通知 + 一行赋值的 <c>Set</c>。
-/// <para>
-/// 没有引入 CommunityToolkit.Mvvm —— 这个界面只有十来个属性，需要的只是
-/// <see cref="INotifyPropertyChanged"/>，为此多一个依赖不划算。</para>
+/// 轻量 MVVM 支撑：属性变更通知 + 一行赋值的 <c>Set</c>。没引入 CommunityToolkit.Mvvm
+/// —— 只有十来个属性，需要的只是 <see cref="INotifyPropertyChanged"/>。
 /// </summary>
 public abstract class Observable : INotifyPropertyChanged
 {
@@ -31,7 +29,7 @@ public abstract class Observable : INotifyPropertyChanged
 /// <summary>导出格式。</summary>
 public enum ExportFormat { Svg, Png }
 
-/// <summary>导出选项。★ 分辨率<b>只对 PNG 有意义</b> —— SVG 是矢量，不存在分辨率。</summary>
+/// <summary>导出选项。分辨率<b>只对 PNG 有意义</b> —— SVG 是矢量，不存在分辨率。</summary>
 public sealed class ExportOptions
 {
     public required ExportFormat Format { get; init; }
@@ -53,8 +51,7 @@ public sealed class ExportOptions
 public sealed class MainViewModel : Observable
 {
     /// <summary>
-    /// 母版输入框的初值。<b>仅调试构建</b>预填一个样例，省得每次启动都手输；
-    /// 发布构建留空，让用户从零开始。
+    /// 母版输入框的初值。<b>仅调试构建</b>预填一个样例，省得每次启动都手输。
     /// </summary>
 #if DEBUG
     const string InitialMaster = Origami.Core.SampleMasters.Krenio;
@@ -93,11 +90,9 @@ public sealed class MainViewModel : Observable
     /// <summary>
     /// 「文本生成母版」开关的当前状态，<b>只控制那个文本输入框显不显示</b>。
     /// <para>
-    /// ★ 它<b>不</b>决定「渲染用哪一份输入」。母版框始终是唯一的渲染来源 ——
-    ///   文本模式生成的母版直接写进母版框（见 <see cref="GenerateFromTextAsync"/>），
-    ///   所以母版框始终可见、始终有效，用户可以随手接着改。
-    ///   早先的实现是把母版框和文本框叠在一起、用开关切换显示，那样一来
-    ///   开关就变成了「模式」而不是「多一个输入框」，语义完全不对。</para>
+    /// 它<b>不</b>决定「渲染用哪一份输入」：母版框始终是唯一的渲染来源 ——
+    /// 文本模式生成的母版直接写进母版框（见 <see cref="GenerateFromTextAsync"/>），
+    /// 所以母版框始终可见、始终有效，用户可以随手接着改。</para>
     /// </summary>
     public bool IsTextMode
     {
@@ -127,9 +122,8 @@ public sealed class MainViewModel : Observable
     /// <summary>
     /// 由折纸字库把文本输入框的内容编成母版串，<b>写进母版框</b>并重渲。
     /// <para>
-    /// 生成结果落到母版框而不是只存在一个只读展示框里，是因为母版框本来就是
-    /// 渲染的唯一来源 —— 落进去之后，用户可以直接编辑它、导出它、切视图看它，
-    /// 不需要在「生成结果」与「母版」之间来回同步。</para>
+    /// 落到母版框而不是另设一个只读展示框：母版框本来就是渲染的唯一来源，
+    /// 落进去之后用户可直接编辑、导出、切视图，不用在两处之间同步。</para>
     /// </summary>
     public async Task GenerateFromTextAsync()
     {
@@ -162,8 +156,7 @@ public sealed class MainViewModel : Observable
             }
 
             MasterText = master;
-            // 直接调 RenderCurrentAsync：此时 Busy 已置位，RebuildAsync 开头的
-            // 守卫会把这次调用挡掉，母版写了却不会渲染。
+            // 必须调 RenderCurrentAsync：Busy 已置位，RebuildAsync 开头的守卫会挡掉它
             await RenderCurrentAsync("正在生成并渲染…");
         }
         finally { Busy = false; }
@@ -234,8 +227,8 @@ public sealed class MainViewModel : Observable
     /// 上色开关。
     /// <para>
     /// 这是一个<b>属性</b>而不是两个视图：「黑白 vs 彩色」「渲染 vs 剪影」是同一张图的
-    /// 两种呈现，不是两张不同的图。所以关掉时折痕图变题面线稿、成品变剪影 ——
-    /// 语义一致，都是「去掉颜色，只看形状」。</para>
+    /// 两种呈现 —— 关掉时折痕图变题面线稿、成品变剪影，语义一致，
+    /// 都是「去掉颜色，只看形状」。</para>
     /// </summary>
     public ColorMode Color
     {
@@ -250,11 +243,9 @@ public sealed class MainViewModel : Observable
     }
 
     /// <summary>
-    /// 开关是否处于「上色」。<b>可写</b> —— 开关直接双向绑定到这个属性。
-    /// <para>
-    /// ★ 这里必须是可写属性。早先写成只读计算属性（<c>_color == ColorMode.Peaks</c>）
-    /// 再用 <c>Mode=TwoWay</c> 绑定，点击时回写找不到 setter，开关<b>点了没反应</b>。
-    /// 让它成为唯一入口，绑定就不需要任何 code-behind 兜底。</para>
+    /// 开关是否处于「上色」。<b>必须是可写属性</b> —— 开关直接双向绑定到它，
+    /// 写成只读计算属性会让点击回写找不到 setter，<b>点了没反应</b>。
+    /// 让它成为唯一入口，绑定就不需要任何 code-behind 兜底。
     /// </summary>
     public bool IsColorOn
     {
@@ -284,12 +275,9 @@ public sealed class MainViewModel : Observable
     /// <summary>
     /// 画布方向（整点旋转 + 镜像）。
     /// <para>
-    /// 折痕推出来的成品偶尔朝向不对 —— 与其去改折叠算法的方向约定，
-    /// 不如在显示层把整张图转一下：同一张母版可以来回对照，
-    /// 而且<b>导出直接继承这个设置</b>，导出对话框里不再问一遍。</para>
-    /// <para>
-    /// ★ 它同时作用于<b>预览与导出</b>（SVG 与 PNG 都是），四个方向互为闭环：
-    ///   转满 360° 回到原样，所以不存在「转乱了回不来」的情况。</para>
+    /// 与其去改折叠算法的方向约定，不如在显示层把整张图转一下：同一张母版可以来回对照，
+    /// 而且<b>导出直接继承这个设置</b>，导出对话框里不再问一遍。
+    /// 四个方向互为闭环，转满 360° 回到原样，不存在「转乱了回不来」。</para>
     /// </summary>
     public CanvasTransform Xform
     {
@@ -338,9 +326,8 @@ public sealed class MainViewModel : Observable
 
     /// <summary>
     /// 「恢复原始方向」按钮是否可用 = 不忙 + 当前确实不是原始方向。
-    /// <para>★ 这是一个<b>组合条件</b>，而 Avalonia 绑定表达式<b>没有</b> <c>&amp;&amp;</c>
-    /// 运算符（写了会在运行时报 ExpressionParseException，编译期却看不出来）。
-    /// 所以组合条件一律在这里算好再暴露出去，而不是在 XAML 里拼。</para>
+    /// <para>Avalonia 绑定表达式<b>没有</b> <c>&amp;&amp;</c> 运算符（写了会在运行时报
+    /// ExpressionParseException，编译期却看不出来），所以组合条件一律在这里算好再暴露出去。</para>
     /// </summary>
     public bool CanResetXform => !Busy && !IsXformIdentity;
 
@@ -354,10 +341,8 @@ public sealed class MainViewModel : Observable
 
     /// <summary>
     /// 导入外部文件（母版文本 / 长条折痕图 SVG / 方形折痕图 SVG，彩色与黑白都支持）。
-    /// <para>
-    /// 导入后做三件事：把还原出的母版填进输入框、把「上色」开关同步成文件里的状态、
-    /// 切到<b>刚导入的那一类视图</b>（导入了方形图就先看方形图）。
-    /// </para>
+    /// <para>导入后：还原出的母版填进输入框、「上色」开关同步成文件里的状态、
+    /// 切到<b>刚导入的那一类视图</b>。</para>
     /// </summary>
     public async Task ImportAsync(string text, string fileName)
     {
@@ -376,8 +361,7 @@ public sealed class MainViewModel : Observable
                 SelectedTab = want;
             ViewerFit?.Invoke(SelectedTab);
 
-            // ★ 必须调RenderCurrentAsync而不是 RebuildAsync —— 后者开头
-            //   `if (Busy) return` 会把这里的调用挡掉，导入后就不会渲染了。
+            // 必须调 RenderCurrentAsync：RebuildAsync 的 `if (Busy) return` 会挡掉它
             await RenderCurrentAsync("正在导入并渲染…");
 
             string where = SelectedTab is null ? "" : $"（{SelectedTab.Title}）";
@@ -451,7 +435,7 @@ public sealed class MainViewModel : Observable
         if (tab is null) return;
         if (_doc is null) { Status = "请先解析母版"; return; }
 
-        // 原子片分解本来每面一色，上色开关对它无意义 —— 这里禁用
+        // 原子片分解本来每面一色，上色开关对它无意义
         CanColorize = tab.SupportsColor;
 
         if (tab.Cached is { } cached)      // 缓存命中
@@ -489,8 +473,8 @@ public sealed class MainViewModel : Observable
     /// <summary>
     /// 按当前设置重渲选中视图（上色开关 / 画布方向变更后调它）。
     /// <para>
-    /// 忙时只置一个待重绘标记、本次结束后补跑一次：连点 10 次方向按钮也只渲染
-    /// 最后那一次，中间态直接跳过 —— 否则画面会停在中间某个方向，和状态栏描述不符。</para>
+    /// 忙时只置一个待重绘标记、本次结束后补跑一次：连点 10 次方向按钮也只渲染最后那一次，
+    /// 中间态直接跳过 —— 否则画面会停在中间某个方向，和状态栏描述不符。</para>
     /// </summary>
     async Task RerenderCurrentAsync()
     {
@@ -554,7 +538,7 @@ public sealed class MainViewModel : Observable
 
         if (opt.Format == ExportFormat.Svg)
         {
-            // SVG 是矢量，「分辨率」对它没有意义，因此直接复用预览那一份文本 ——
+            // SVG 是矢量，「分辨率」对它没有意义，因此复用预览那一份文本 ——
             // 但缓存是用画布当前配色建的，用户在对话框里改了配色就必须重建。
             var svg = opt.Color == Color && tab.Cached is { } cached
                 ? cached
@@ -562,7 +546,7 @@ public sealed class MainViewModel : Observable
             return (System.Text.Encoding.UTF8.GetBytes(svg), "svg");
         }
 
-        // ★ 方向不在导出对话框里问：直接继承画布当前设置
+        // 方向不在导出对话框里问：直接继承画布当前设置
         return (Views.RenderPng(_doc, tab.Kind, opt.Color, opt.PngScale, Xform), "png");
     }
 

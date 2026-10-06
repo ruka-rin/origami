@@ -48,9 +48,8 @@ sealed record SvgPolygon(IReadOnlyList<Point> Points, Color? Fill, Color? Stroke
 /// <summary>
 /// 解析好的 SVG 文档。
 /// <para>
-/// ★ 只支持本项目自己生成的子集：<c>&lt;rect&gt;</c> / <c>&lt;line&gt;</c> /
-/// <c>&lt;polygon&gt;</c> + 少量样式属性。这不是「通用 SVG 渲染器」，
-/// 也不打算是 —— 折痕图的元素种类是我们完全可控的有限集合，
+/// 只支持本项目自己生成的子集：<c>&lt;rect&gt;</c> / <c>&lt;line&gt;</c> /
+/// <c>&lt;polygon&gt;</c> + 少量样式属性。折痕图的元素种类是完全可控的有限集合，
 /// 支持全特性 SVG 只会带来一堆用不上的代码和攻击面。</para>
 /// </summary>
 public sealed class SvgDocument
@@ -70,14 +69,10 @@ public sealed class SvgDocument
 
         var nodes = new List<SvgNode>();
 
-        // ★ 必须递归：生成端把所有图元包在 <g> 里，只遍历 root.Elements() 会漏掉
-        //   整个 <g> 的内容（表现是「纸底画出来了、线条一条都没有」）。
-        //
-        // ★ <g> 上的 transform 必须<b>真正施加到坐标上</b>，不能只当分组看。
-        //   画布方向（旋转 / 镜像）正是靠 <g transform="matrix(...)"> 表达的
-        //   （见 Core 的 SvgTransform.Apply），而 viewBox 此时<b>已经</b>换成
-        //   变换后的尺寸。若忽略它：viewBox 变成 50×100 而图形仍是 100×50 的
-        //   原始朝向 —— 画面既没转又被裁掉一半，「预览与导出一致」当场失效。
+        // 必须递归：生成端把所有图元包在 <g> 里，只遍历 root.Elements() 会漏掉整个 <g>。
+        // 且 <g> 上的 transform 必须<b>真正施加到坐标上</b>：画布方向（旋转 / 镜像）
+        // 正是靠 <g transform="matrix(...)"> 表达的，而 viewBox 此时<b>已经</b>换成变换后的
+        // 尺寸 —— 忽略它会让画面既没转又被裁掉一半。
         Walk(root, Matrix.Identity, nodes);
 
         return new SvgDocument { ViewBox = vb, Nodes = nodes };
@@ -101,11 +96,10 @@ public sealed class SvgDocument
     }
 
     /// <summary>
-    /// 解析 <c>transform</c> 属性。
-    /// <para>★ 只认 <c>matrix(a b c d e f)</c>（本项目唯一会写出的形式）。
+    /// 解析 <c>transform</c> 属性。只认 <c>matrix(a b c d e f)</c>（本项目唯一会写出的形式）；
     /// 其它关键字（<c>rotate</c> / <c>translate</c> / <c>scale</c>）来自外部 SVG，
     /// 遇到就<b>报错</b>而不是静默忽略 —— 静默忽略会画出一张方向与比例全错的图，
-    /// 用户却以为是自己看错了。</para>
+    /// 用户却以为是自己看错了。
     /// </summary>
     static Matrix ParseTransform(string? s)
     {

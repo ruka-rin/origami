@@ -13,11 +13,10 @@ public enum FitMode
 
 /// <summary>一个可显示的视图种类。</summary>
 /// <para>
-/// ★ 只有 <b>5 个</b>：长条 / 方形 / 长条成品 / 方形成品 / 原子片。
 /// 「黑白 vs 彩色」「渲染 vs 剪影」<b>不是独立视图</b>，而是同一张图的
 /// <see cref="ViewInfo.ColorModes"/> 属性 —— 由界面上的一个「上色」开关切换。
-/// 拆成 9 个视图会让侧栏变成两倍长，而这两组之间没有任何其它差异。</para>
-/// </summary>
+/// 拆成 9 个视图只会让侧栏变成两倍长，而这两组之间没有任何其它差异。
+/// </para>
 public enum ViewKind
 {
     Strip,        // 长条折痕图
@@ -39,8 +38,8 @@ public enum ColorMode
 
 /// <summary>视图的元信息（用于侧栏与状态栏）。</summary>
 /// <param name="Fit">
-/// 默认取景。★ 长条折痕图是 100 格 × 1 格（宽高比 100:1），用「适应窗口」会把每格
-/// 压到几个像素，等于什么都看不清，所以单独用「铺满宽度」。</param>
+/// 默认取景。长条折痕图是 100 格 × 1 格（宽高比 100:1），用「适应窗口」会把每格
+/// 压到几个像素，等于什么都看清，所以单独用「铺满宽度」。</param>
 public sealed record ViewInfo(ViewKind Kind, string Group, string Name, string Hint,
                              FitMode Fit = FitMode.Window)
 {
@@ -82,9 +81,8 @@ public static class Views
     /// <summary>
     /// 跑完整条链路：母版解析 -&gt; 长条模型 -&gt; 方形 CP -&gt; 两种折叠。
     /// <para>
-    /// ★ 两条折叠路径<b>不是同一件事</b>，成品也不同，所以都保留、都展示：
-    ///   · 顺次滚动 —— 长条母版本来的意图（拉一条纸、一格一格卷起来）；
-    ///   · 树反射 —— 先铺成方形 CP 再沿折痕树反射，是 KRENIO / PROTEIN 拼出字母的那条路。
+    /// 两条折叠路径<b>不是同一件事</b>，成品也不同，所以都保留、都展示：
+    /// 顺次滚动（长条母版的意图）与树反射（KRENIO / PROTEIN 拼出字母的那条路）。
     /// </para>
     /// </summary>
     public static Document Build(string masterText)
@@ -117,15 +115,12 @@ public static class Views
     /// 对成品是「剪影、纯黑块」；<see cref="ColorMode.Peaks"/> 则是峰谷着色。
     /// 同一个开关在两类图上语义一致：<b>关 = 看结构，关掉颜色只看形状</b>。</param>
     /// <param name="xform">
-    /// 画布方向。★ <b>预览与导出传的是同一个值</b>，所以屏幕上是什么方向，
+    /// 画布方向。<b>预览与导出传的是同一个值</b>，所以屏幕上是什么方向，
     /// 存到文件里就是什么方向。</param>
     /// <remarks>
-    /// ★ <b>预览一律走 SVG，不走位图。</b>预览要的是「放大到 8 倍仍然锐利」，
-    /// 而位图在 4 倍以上就糊了；SVG 是矢量，任何倍率都锐，也不需要「分辨率」这个
-    /// 概念 —— 它只在导出 PNG 时才有意义。
-    /// <br/>
-    /// 这里用<b>固定</b>的 unit 生成，用户坐标系下每格多少像素就定了；
-    /// 显示大小由 <see cref="SvgView"/> 的缩放负责，与这里的 unit 无关。
+    /// <b>预览一律走 SVG，不走位图</b>（位图在 4 倍以上就糊了，而分辨率这个概念
+    /// 只在导出 PNG 时才有意义）。这里用<b>固定</b>的 unit 生成，用户坐标系下每格
+    /// 多少像素就定了；显示大小由 <see cref="SvgView"/> 的缩放负责，与这里的 unit 无关。
     /// </remarks>
     public static string BuildSvg(Document doc, ViewKind kind, ColorMode color,
                                   CanvasTransform xform = default)
@@ -139,7 +134,7 @@ public static class Views
         double creaseLw = kind == ViewKind.Strip ? 1.2 : 1.6;
 
         // 成品坐标朝向：长条顺次折叠是数学坐标（y 向上）-> 需翻转；
-        //             方形树反射已是屏幕坐标（y 向下）-> 直接用。
+        //             方形树反射已是屏幕坐标（y 向下）-> 直接用
         var stripF = doc.StripFolded;
         var squareF = doc.SquareFolded;
 

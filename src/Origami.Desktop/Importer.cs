@@ -27,13 +27,10 @@ public sealed record ImportResult(
 public static class Importer
 {
     /// <summary>
-    /// 从文件文本还原母版。
+    /// 从文件文本还原母版。支持三类输入：<b>母版纯文本</b>、<b>长条折痕图 SVG</b>、
+    /// <b>方形折痕图 SVG</b>，各自彩色 / 黑白都支持。
     /// <para>
-    /// ★ 支持三类输入：<b>母版纯文本</b>、<b>长条折痕图 SVG</b>、<b>方形折痕图 SVG</b>，
-    /// 各自彩色 / 黑白都支持。
-    /// </para>
-    /// <para>
-    /// ★ <b>成品 / 原子片 SVG 导不进来</b>：那两类图只画折叠后的面片，折痕的
+    /// <b>成品 / 原子片 SVG 导不进来</b>：那两类图只画折叠后的面片，折痕的
     /// 「层序 + 相邻关系」在生成时就没有写进文件，无法反推回母版。明确报错比
     /// 悄悄给个错结果好。
     /// </para>
@@ -51,8 +48,8 @@ public static class Importer
 
         var model = SvgIO.SvgToModel(text, strict: false);
 
-        // ★ 先按 kind 分派，再检查折痕数。反过来会让「成品 / 原子片 SVG」报出
-        //   「没识别到折痕」这种驴唇不对马嘴的话，而真实原因是「这类图压根不该导入」。
+        // 先按 kind 分派，再检查折痕数。反过来会让「成品 / 原子片 SVG」报出
+        // 「没识别到折痕」这种驴唇不对马嘴的话，而真实原因是「这类图压根不该导入」
         if (model.Kind is "folded" or "pieces")
             throw new FormatException(
                 $"「{fileName}」是{(model.Kind == "folded" ? "折叠成品" : "原子片分解")}图，" +
@@ -99,12 +96,9 @@ public static class Importer
         => text.Contains("<svg", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// 判断这份 SVG 是上色还是黑白。
-    /// <para>
-    /// ★ 只看<b>描边色</b>，不能看 <c>data-mv</c>：本工具生成的<b>黑白</b> SVG 依然带
-    /// <c>data-mv="M"/"V"</c>（峰谷是图的数据，去了上色也不能丢），拿它判断会把
-    /// 黑白图误判成彩色。
-    /// </para>
+    /// 判断这份 SVG 是上色还是黑白。<b>只看描边色</b>，不能看 <c>data-mv</c>：
+    /// 本工具生成的<b>黑白</b> SVG 依然带 <c>data-mv="M"/"V"</c>（峰谷是图的数据，
+    /// 去了上色也不能丢），拿它判断会把黑白图误判成彩色。
     /// </summary>
     static ColorMode DetectColor(string svg)
     {

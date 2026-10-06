@@ -10,16 +10,15 @@ namespace Origami.Desktop;
 /// <summary>
 /// 矢量 SVG 预览控件：<b>无损缩放</b>，只在鼠标操作下交互。
 /// <para>
-/// ★ 为什么是矢量而不是位图：折痕图是规整网格、成品是斜边剪影，用 PNG 预览时
-/// 放大到 8倍就糊了 —— 而「看清一条折痕的端点」恰恰是这个工具的核心用途。
-/// 直接解析 SVG 并用 <c>DrawingContext</c> 画几何，任何倍率都是锐的，
-/// 也省掉「分辨率」这个概念（只在导出 PNG 时才需要）。</para>
+/// 为什么是矢量而不是位图：折痕图是规整网格、成品是斜边剪影，位图放大到 8 倍就糊了
+/// —— 而「看清一条折痕的端点」恰恰是这个工具的核心用途。
+/// </para>
 /// <para>
 /// <b>为什么自己写</b>：Avalonia 没有内置 SVG 渲染控件，第三方包多为移动端设计，
-/// 在桌面端的滚轮缩放 / 触控板双指缩放这些交互上并不完整。这里只需要
-/// 「滚轮缩放 + 按住拖动」，因此写一个专用控件比引入依赖更合适。</para>
+/// 在桌面端的滚轮缩放 / 触控板双指缩放上并不完整。这里只需要「滚轮缩放 + 按住拖动」。
+/// </para>
 /// <para>
-/// <b>缩放锚点</b>：滚轮缩放时保持<b>光标下的图像点不动</b>。否则以控件中心缩放，
+/// <b>缩放锚点</b>：滚轮缩放时保持<b>光标下的图像点不动</b>，否则以控件中心缩放，
 /// 细节图会「跳」出视野。</para>
 /// </summary>
 public sealed class SvgView : Control
@@ -123,11 +122,9 @@ public sealed class SvgView : Control
         if (Math.Abs(zoom - _zoom) < 1e-12) return;
         _zoom = zoom;
 
-        // ★ after 必须是「换算后」的实际倍率，不能直接拿 _zoom 顶上。
-        //   before 是 FitScale × _zoom（含适应窗口的倍率），而 _zoom 只是
-        //   相对倍率 —— 两者量纲不同，相除得到的是 factor / FitScale 而不是
-        //   factor，缩放就会朝错误的方向跑，而且看起来只是「锚点不准」。
-        //   FitScale 在本次调用内不会变（Bounds 没动），所以直接重取一次即可。
+        // after 必须是「换算后」的实际倍率，不能拿 _zoom 顶上：before 是 FitScale × _zoom
+        // （含适应窗口的倍率），而 _zoom 只是相对倍率，量纲不同。FitScale 在本次调用内
+        // 不会变（Bounds 没动），所以直接重取一次即可。
         double after = EffectiveScale;
 
         // 锚点公式在 Viewport.AnchorPan 里（有单元测试钉着）
@@ -167,15 +164,10 @@ public sealed class SvgView : Control
     bool _toggledFit;
 
     /// <summary>
-    /// 换图时<b>是否保留当前的缩放与平移</b>。
-    /// <para>
-    /// 判据是<b>viewBox 尺寸是否相同</b>：换视图时 viewBox 必然不同（长条 / 方形 / 成品
-    /// 的用户坐标范围都不一样），而切上色时用户坐标一格没动、只有颜色变了。
-    /// </para>
-    /// <para>
-    /// 不保留的代价很实际：放大到一半正在看某条折痕的端点，拨一下开关画面就弹回
-    /// 适应窗口，刚找到的位置全丢。
-    /// </para>
+    /// 换图时<b>是否保留当前的缩放与平移</b>。判据是<b>viewBox 尺寸是否相同</b>：
+    /// 换视图时 viewBox 必然不同（长条 / 方形 / 成品的用户坐标范围都不一样），
+    /// 而切上色时用户坐标一格没动、只有颜色变了。不保留的代价很实际：
+    /// 正在看某条折痕的端点，拨一下开关画面就弹回适应窗口，刚找到的位置全丢。
     /// </summary>
     public static bool ShouldPreserveView(Rect oldBox, Rect newBox)
         => oldBox.Width > 0 && oldBox.Height > 0
@@ -259,7 +251,7 @@ public sealed class SvgView : Control
         if (_doc is null) return;
 
         // 触控板会发一串细分滚轮事件；不累加，按方向乘固定步长（每格 1.15 倍），
-        // 这样触控板与鼠标滚轮手感一致。
+        // 这样触控板与鼠标滚轮手感一致
         double step = Math.Pow(1.15, Math.Sign(e.Delta.Y));
         var p = e.GetPosition(this);
         ZoomAt(step, p.X, p.Y);

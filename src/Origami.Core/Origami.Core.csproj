@@ -11,12 +11,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!--
-      抗锯齿绘制与 PNG 编码。
-      ImageSharp.Drawing 2.1.7 为 Apache-2.0，纯托管、无原生依赖，
-      在 Windows / Linux / macOS 与容器里都能跑，且结果可复现。
-      （3.x 起改为 Six Labors Split License，故锁定 2.x。）
-    -->
+    <!-- 抗锯齿绘制与 PNG 编码。锁定 2.x：纯托管、无原生依赖，跨平台且结果可复现；
+         3.x 起改为 Six Labors Split License。 -->
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
   </ItemGroup>
 

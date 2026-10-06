@@ -8,9 +8,8 @@ namespace Origami.Cli;
 /// <para><b>子命令</b>：
 /// <c>master2svg</c>、<c>master2square</c>、<c>svg2json</c>、<c>json2svg</c>、<c>svg2png</c>、
 /// <c>json2folded</c>、<c>reverse</c>、<c>crosscheck</c>、<c>build</c>、<c>verify</c>。</para>
-/// <para>★ 母版 -&gt; 方形 CP 是<b>完整可推导</b>的：不需要手绘基准参与生成，
+/// <para>母版 -&gt; 方形 CP 是<b>完整可推导</b>的：不需要手绘基准参与生成，
 /// 基准只用于 <c>crosscheck</c> 做回归验证。</para>
-/// <para>随机母版压力测试在测试项目里（<c>StressTests</c>），随 <c>dotnet test</c> 运行。</para>
 /// <para>示例：<c>origami build -m "/....|../.." -o out/</c></para>
 /// </summary>
 public static class Cli
@@ -101,10 +100,8 @@ public static class Cli
 
         string cmd = rest[0];
         var args = Args.Parse(rest.Skip(1).ToArray());
-        // --fold-unit 有自己的默认值 48，**不跟随** --unit：
-        // 折痕图是按格对齐的规整网格（适合大 unit 便于打印），
-        // 折叠成品是斜边为主的剪影（大 unit 只是徒增文件体积），
-        // 两者用不同的默认分辨率是合理的。
+        // --fold-unit 有自己的默认值 48，**不跟随** --unit：折痕图是按格对齐的规整网格
+        // （适合大 unit 便于打印），折叠成品是斜边为主的剪影（大 unit 只是徒增文件体积）
 
         return cmd switch
         {
@@ -442,7 +439,7 @@ public static class Cli
     /// <summary>普通文本 -&gt; 折痕母版串（折纸字库）。</summary>
     static int CmdText(Args a)
     {
-        // 短/长选项在 Args 里是两个独立键，两个都得查（与 ReadMaster 同理）
+        // 短/长选项在 Args 里是两个独立键，两个都得查
         string text = (a.Has("t") || a.Has("text")) ? a.Get("t") ?? a.Get("text")!
             : (a.Has("tf") || a.Has("text-file")) ? ReadText(a.Get("tf") ?? a.Get("text-file")!)
             : "";
@@ -478,7 +475,7 @@ public static class Cli
         return 0;
     }
 
-    /// <summary>导出单个视图。★ SVG 是矢量，「分辨率」对它无意义，只对 PNG 有效。</summary>
+    /// <summary>导出单个视图。SVG 是矢量，「分辨率」对它无意义，只对 PNG 有效。</summary>
     static int CmdExport(Args a, double unit, double foldUnit)
     {
         var master = ReadMaster(a);
