@@ -20,13 +20,6 @@ public static class SegSets
         foreach (var x in src) s.Add(x);
         return s;
     }
-
-    public static HashSet<Point> CreatePoints(IEnumerable<Point> src)
-    {
-        var s = new HashSet<Point>();
-        foreach (var x in src) s.Add(x);
-        return s;
-    }
 }
 
 /// <summary>线段 / 点的字典序比较（等价于按 (x, y) 逐分量比较）。</summary>
@@ -66,11 +59,4 @@ public static class SegOrder
 
     /// <summary>线段规范键（带 6 位容差），用于浮点坐标比对。</summary>
     public static Segment Key(Point a, Point b) => Geom.SegKey(a, b);
-
-    public static HashSet<Segment> Keyed(IEnumerable<Segment> src)
-    {
-        var s = new HashSet<Segment>();
-        foreach (var x in src) s.Add(Geom.SegKey(x.A, x.B));
-        return s;
-    }
 }

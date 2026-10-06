@@ -51,6 +51,13 @@ public static class Cli
         catch (Exception e) { throw new UserError($"读取失败 {path}: {e.Message}"); }
     }
 
+    /// <summary>解析 --unit 类选项。非法数字是用户错误，应报 UserError（退出码 2）而非异常。</summary>
+    static double ParseUnit(string opt, string raw)
+        => double.TryParse(raw, System.Globalization.NumberStyles.Float,
+                           System.Globalization.CultureInfo.InvariantCulture, out double v) && v > 0
+            ? v
+            : throw new UserError($"{opt} 需要一个正数，收到「{raw}」");
+
     static void WriteText(string path, string content)
     {
         EnsureDir(path);
@@ -60,7 +67,8 @@ public static class Cli
     static void WritePng(string path, Raster img)
     {
         EnsureDir(path);
-        File.WriteAllBytes(path, img.ToPngBytes());
+        // Raster 持有ImageSharp 的池化内存，必须释放，否则批量导出时进程内存只涨不落
+        using (img) File.WriteAllBytes(path, img.ToPngBytes());
     }
 
     static void EnsureDir(string path)
@@ -84,8 +92,8 @@ public static class Cli
         {
             switch (argv[i])
             {
-                case "--unit" when i + 1 < argv.Length: unit = double.Parse(argv[++i]); break;
-                case "--fold-unit" when i + 1 < argv.Length: foldUnit = double.Parse(argv[++i]); break;
+                case "--unit" when i + 1 < argv.Length: unit = ParseUnit("--unit", argv[++i]); break;
+                case "--fold-unit" when i + 1 < argv.Length: foldUnit = ParseUnit("--fold-unit", argv[++i]); break;
                 default: rest.Add(argv[i]); break;
             }
         }
@@ -176,7 +184,8 @@ public static class Cli
         if (a.Has("f") || a.Has("master-file"))
         {
             string p = a.Get("f") ?? a.Get("master-file")!;
-            return Master.ParseMaster(File.ReadAllText(p).Trim());
+            // 走 ReadText：路径写错是最高频的用户错误，应当报成 UserError（退出码 2）
+            return Master.ParseMaster(ReadText(p).Trim());
         }
         throw new UserError("需要 -m 母版字符串 或 --master-file 路径");
     }
@@ -475,7 +484,9 @@ public static class Cli
         var master = ReadMaster(a);
         bool png = a.Flag("png");
         bool plain = a.Flag("plain");
-        double scale = double.TryParse(a.Get("png-scale"), out var sc) ? sc : 2.0;
+        double scale = a.Get("png-scale") is { } ps
+            ? ParseUnit("--png-scale", ps)
+            : 2.0;
 
         string view = a.Get("view", "方形");
         string outPath = a.Get("o") ?? Path.Combine("out", view + (png ? ".png" : ".svg"));
@@ -488,22 +499,22 @@ public static class Cli
         var squareFold = FoldOps.FoldSquare(plan, orient: false);
 
         // 视图名 -> (SVG 文本, PNG 渲染器)
-        (string Svg, Func<byte[]> Png) pick = view switch
+        (string Svg, Func<Raster> Png) pick = view switch
         {
             "长条" => (
                 SvgIO.ModelToSvg(stripModel, unit, unit * 0.58, 1.2 * scale, color: !plain),
-                () => WritePngBytes(PngIO.RenderCreaseBlack(stripModel, unit * scale,
+                () => (PngIO.RenderCreaseBlack(stripModel, unit * scale,
                                        unit * scale * 0.58, lw: 1.2 * scale))),
 
             "方形" => (
                 SvgIO.ModelToSvg(squareModel, unit, unit, 1.6 * scale, color: !plain),
-                () => WritePngBytes(PngIO.RenderCreaseBlack(squareModel, unit * scale,
+                () => (PngIO.RenderCreaseBlack(squareModel, unit * scale,
                                        unit * scale, lw: 1.6 * scale))),
 
             "长条成品" => (
                 SvgIO.FoldedToSvg(stripFold.World, stripFold.Rank, plain ? null : stripFold.MvMap,
                                   mvSeq: null, unit: foldUnit, color: !plain, flipY: true),
-                () => WritePngBytes(PngIO.RenderFolded(stripFold.World, foldUnit * scale,
+                () => (PngIO.RenderFolded(stripFold.World, foldUnit * scale,
                                        foldUnit * scale * 0.65, rank: stripFold.Rank,
                                        mvMap: plain ? null : stripFold.MvMap,
                                        lw: plain ? 0 : 1.2 * scale,
@@ -513,7 +524,7 @@ public static class Cli
             "方形成品" => (
                 SvgIO.FoldedToSvg(squareFold.World, squareFold.Rank, plain ? null : squareFold.MvMap,
                                   mvSeq: null, unit: foldUnit, color: !plain, flipY: false),
-                () => WritePngBytes(PngIO.RenderFolded(squareFold.World, foldUnit * scale,
+                () => (PngIO.RenderFolded(squareFold.World, foldUnit * scale,
                                        foldUnit * scale * 0.65, rank: squareFold.Rank,
                                        mvMap: plain ? null : squareFold.MvMap,
                                        lw: plain ? 0 : 1.2 * scale,
@@ -522,12 +533,12 @@ public static class Cli
 
             "长条原子片" => (
                 SvgIO.PiecesToSvg(stripFold.World, foldUnit, foldUnit * 0.6, flipY: true),
-                () => WritePngBytes(PngIO.RenderPieces(stripFold.World, foldUnit * scale,
+                () => (PngIO.RenderPieces(stripFold.World, foldUnit * scale,
                                        foldUnit * scale * 0.6, flipY: true))),
 
             "方形原子片" => (
                 SvgIO.PiecesToSvg(squareFold.World, foldUnit, foldUnit * 0.6, flipY: false),
-                () => WritePngBytes(PngIO.RenderPieces(squareFold.World, foldUnit * scale,
+                () => (PngIO.RenderPieces(squareFold.World, foldUnit * scale,
                                        foldUnit * scale * 0.6, flipY: false))),
 
             _ => throw new UserError($"未知视图「{view}」"),
@@ -535,21 +546,15 @@ public static class Cli
 
         if (png)
         {
-            var bytes = pick.Png();
-            var dir = Path.GetDirectoryName(Path.GetFullPath(outPath));
-            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-            File.WriteAllBytes(outPath, bytes);
-            Console.WriteLine($"导出 PNG {scale:0.#}×  {(plain ? "黑白" : "彩色")}  -> {outPath}  ({bytes.Length / 1024} KB)");
+            WritePng(outPath, pick.Png());
+            Console.WriteLine($"导出 PNG {scale:0.#}×  {(plain ? "黑白" : "彩色")}  -> {outPath}  ({new FileInfo(outPath).Length / 1024} KB)");
         }
         else
         {
             WriteText(outPath, pick.Svg);
-            var info = new FileInfo(outPath);
-            Console.WriteLine($"导出 SVG{(plain ? "  黑白/剪影" : "  彩色")}  -> {outPath}  ({info.Length / 1024} KB)");
+            Console.WriteLine($"导出 SVG{(plain ? "  黑白/剪影" : "  彩色")}  -> {outPath}  ({new FileInfo(outPath).Length / 1024} KB)");
         }
         return 0;
-
-        static byte[] WritePngBytes(Raster r) { using (r) { return r.ToPngBytes(); } }
     }
 
     static int CmdVerify(Args a, double unit)
@@ -605,6 +610,15 @@ public static class Cli
         readonly List<string> _pos = new();
         readonly HashSet<string> _flags = new(StringComparer.Ordinal);
 
+        /// <summary>
+        /// 不接受取值的开关。必须显式列出：否则 <c>--png out.png</c> 会被解析成
+        /// 「png 的值是 out.png」，开关静默失效、路径也被吞掉，退出码还是 0。
+        /// </summary>
+        static readonly HashSet<string> Valueless = new(StringComparer.Ordinal)
+        {
+            "png", "plain", "lenient", "mirror", "left",
+        };
+
         public static Args Parse(string[] argv)
         {
             var a = new Args();
@@ -613,7 +627,7 @@ public static class Cli
                 string t = argv[i];
                 if (!t.StartsWith('-')) { a._pos.Add(t); continue; }
                 string key = t.TrimStart('-');
-                if (i + 1 < argv.Length && !argv[i + 1].StartsWith('-'))
+                if (!Valueless.Contains(key) && i + 1 < argv.Length && !argv[i + 1].StartsWith('-'))
                     a._opt[key] = argv[++i];
                 else
                     a._flags.Add(key);

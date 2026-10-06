@@ -45,8 +45,11 @@ public sealed class FoldedModel
     {
         k %= 4;
         if (k == 0) return this;
+        // 必须走 7 参构造器：6 参那个会把 MvSeq 置空（见其内部实现），
+        // 而 OrientLandscape 默认就会走到这里。
         return new FoldedModel(World.Select(f => RotPoly(f, k)).ToList(), new List<int>(Rank),
                                new Dictionary<int, string>(MvMap),
+                               new List<string>(MvSeq),
                                FacesFlat.Select(f => RotPoly(f, k)).ToList(),
                                new List<Segment>(Creases), Groups);
     }
@@ -177,34 +180,6 @@ public static class FoldOps
             }
         }
         return (adj, fk);
-    }
-
-    /// <summary>从 <c>start</c> 沿折痕邻接走一条链；中途分叉则报错。</summary>
-    public static (List<int> Chain, List<Segment> Creases) WalkChain(
-        Dictionary<int, List<AdjEdge>> adj, int start)
-    {
-        var chain = new List<int>();
-        var creases = new List<Segment>();
-        // prev = -1 表示「无前驱」（面下标均 >= 0）
-        int prev = -1, cur = start;
-
-        while (true)
-        {
-            chain.Add(cur);
-            var cands = new List<AdjEdge>();
-            if (adj.TryGetValue(cur, out var l))
-                foreach (var e in l)
-                    if (e.Neighbor != prev) cands.Add(e);
-
-            if (cands.Count == 0) break;
-            if (cands.Count > 1)
-                throw new InvalidOperationException(
-                    $"面 {cur} 有 {cands.Count} 个未访问邻居，该分支不是一条链");
-            prev = cands[0].Neighbor;
-            cur = cands[0].Neighbor;
-            creases.Add(cands[0].Crease);
-        }
-        return (chain, creases);
     }
 
     // ==================================================================

@@ -120,19 +120,31 @@ public static class JsonLite
             if (s[i] == '\\' && i + 1 < s.Length)
             {
                 i++;
-                sb.Append(s[i] switch
+                if (s[i] == 'u')
                 {
-                    'n' => '\n', 't' => '\t', 'r' => '\r',
-                    'b' => '\b', 'f' => '\f',
-                    'u' => (char)ushort.Parse(s.Substring(i + 1, 4),
-                                              NumberStyles.HexNumber, CultureInfo.InvariantCulture),
-                    _ => s[i],
-                });
-                if (s[i] == 'u') i += 4;
+                    // 必须先校验剩余长度：截断的 \u 序列要报 FormatException（与其他畸形
+                    // 输入一致），而不是让 Substring 抛 ArgumentOutOfRangeException 漏过
+                    // 调用方的 catch (FormatException)。
+                    if (i + 5 > s.Length)
+                        throw new FormatException($"位置 {i} 处\\u 转义被截断");
+                    sb.Append((char)ushort.Parse(s.AsSpan(i + 1, 4),
+                                                  NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+                    i += 4;
+                }
+                else
+                {
+                    sb.Append(s[i] switch
+                    {
+                        'n' => '\n', 't' => '\t', 'r' => '\r',
+                        'b' => '\b', 'f' => '\f',
+                        _ => s[i],
+                    });
+                }
             }
             else sb.Append(s[i]);
             i++;
         }
+        if (i >= s.Length) throw new FormatException("字符串未闭合");
         i++;                                    // closing quote
         return sb.ToString();
     }

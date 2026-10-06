@@ -105,10 +105,12 @@ public static class Layout
                     $"尾部填充未收敛：x={x} total={total}（母版长度超出方形容量）");
             guard++;
 
-            // ★ RawCrease 的构造顺序是 (Xb, Xt)，别写反：
-            //   diag==1 表示「xt 在前、xb 在后」，即 xt = x、xb = x + UNIT。
+            // RawCrease 的构造顺序是 (Xb, Xt)：diag==1 表示 xt 在前，即 xt = x、xb = x + Unit。
+            // diag==0 说明末条折痕的方向推不出来（母版以 '.' 收尾时最后一条对角被素格拉开）：
+            // 此时必须补一条竖直折痕，否则 x 前进却不落任何折痕，方形右端会整段留白。
             if (diag == 1) creases.Add(new RawCrease(x + Unit, x));
             else if (diag == -1) creases.Add(new RawCrease(x, x + Unit));
+            else creases.Add(new RawCrease(x, x));
             x += Unit;
 
             if (x >= total) break;
@@ -124,7 +126,6 @@ public static class Layout
         public int Square { get; init; }
         public int N { get; init; }
         public int Width { get; init; }
-        public int YOffset { get; init; }
         /// <summary>绘制顺序下的折痕线段列表（峰谷交替依据）。</summary>
         public List<Segment> Order { get; init; } = new();
         /// <summary>线段 -&gt; 'M'(红/峰) | 'V'(蓝/谷)。</summary>
@@ -248,7 +249,6 @@ public static class Layout
             Square = square,
             N = n,
             Width = width,
-            YOffset = yState,
             Order = order,
             FoldMv = foldMv,
             Cut = cut,

@@ -134,33 +134,39 @@ public sealed class MainViewModel : Observable
     public async Task GenerateFromTextAsync()
     {
         if (Busy) return;
-
-        string raw = TextInput;
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            Status = "请输入要生成的文本";
-            return;
-        }
-
-        string master;
+        Busy = true;
         try
         {
-            master = await Task.Run(() => Origami.Core.FoldFont.TextToMaster(raw));
-        }
-        catch (Exception e)
-        {
-            Status = "生成失败：" + e.Message;
-            return;
-        }
+            string raw = TextInput;
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                Status = "请输入要生成的文本";
+                return;
+            }
 
-        if (master.Length == 0)
-        {
-            Status = "文本里没有字库支持的字符（A-Z 0-9 与空格）";
-            return;
-        }
+            string master;
+            try
+            {
+                master = await Task.Run(() => Origami.Core.FoldFont.TextToMaster(raw));
+            }
+            catch (Exception e)
+            {
+                Status = "生成失败：" + e.Message;
+                return;
+            }
 
-        MasterText = master;
-        await RebuildAsync();
+            if (master.Length == 0)
+            {
+                Status = "文本里没有字库支持的字符（A-Z 0-9 与空格）";
+                return;
+            }
+
+            MasterText = master;
+            // 直接调 RenderCurrentAsync：此时 Busy 已置位，RebuildAsync 开头的
+            // 守卫会把这次调用挡掉，母版写了却不会渲染。
+            await RenderCurrentAsync("正在生成并渲染…");
+        }
+        finally { Busy = false; }
     }
 
     // ---------------------------------------------------------------- 状态
@@ -292,9 +298,9 @@ public sealed class MainViewModel : Observable
         {
             if (_xform == value) return;
             _xform = value;
+            IsXformIdentity = value.IsIdentity;
 
             RaisePropertyChanged(nameof(XformDescription));
-            RaisePropertyChanged(nameof(IsXformIdentity));
             RaisePropertyChanged(nameof(CanResetXform));
 
             InvalidateCaches();       // 方向变了，缓存的 SVG 一律作废
@@ -433,11 +439,7 @@ public sealed class MainViewModel : Observable
         }
         catch (Exception e)
         {
-            _doc = null;
-            Summary = "";
-            InvalidateCaches();
-            SvgSource = null;
-            RaisePropertyChanged(nameof(HasSvg));
+            ClearAll();
             Status = "出错：" + e.Message;
         }
         finally { Busy = false; }
@@ -460,26 +462,35 @@ public sealed class MainViewModel : Observable
             return;
         }
 
+        // 侧栏在 Busy 期间仍可点，连点两个未缓存视图会并发构建，
+        // 用递增序号保证「只有最后一次点击的结果能落地」。
+        int seq = ++_viewSeq;
         Busy = true;
         Status = $"正在构建 {tab.Group}·{tab.Name}…";
         try
         {
             var svg = await Task.Run(() => Views.BuildSvg(_doc, tab.Kind, Color, Xform));
+            if (seq != _viewSeq) return;         // 已被更新的请求取代，丢弃
             SetSvg(svg, tab);
             Status = Describe(tab);
         }
-        catch (Exception e) { Status = "出错：" + e.Message; }
-        finally { Busy = false; }
+        catch (Exception e)
+        {
+            if (seq == _viewSeq) Status = "出错：" + e.Message;
+        }
+        finally
+        {
+            if (seq == _viewSeq) Busy = false;
+        }
     }
+
+    int _viewSeq;
 
     /// <summary>
     /// 按当前设置重渲选中视图（上色开关 / 画布方向变更后调它）。
     /// <para>
-    /// ★ <b>不能在 Busy 时直接 return</b> —— 那样连续快速点两下方向按钮，
-    ///   第二次会被前一次的 Busy 挡掉，画面停在中间某个方向，
-    ///   而状态栏的「旋转 90°」和实际画面不符。
-    ///   这里改成「置一个待重绘标记，本次结束后补跑一次」：
-    ///   连点 10 次也只会渲染最后那一次，中间态直接跳过。</para>
+    /// 忙时只置一个待重绘标记、本次结束后补跑一次：连点 10 次方向按钮也只渲染
+    /// 最后那一次，中间态直接跳过 —— 否则画面会停在中间某个方向，和状态栏描述不符。</para>
     /// </summary>
     async Task RerenderCurrentAsync()
     {
@@ -490,24 +501,25 @@ public sealed class MainViewModel : Observable
         if (Busy) { _rerenderPending = true; return; }
 
         Busy = true;
+        string? err = null;
         try
         {
             do
             {
                 _rerenderPending = false;
                 Status = "正在更新画布…";
-                // ★ 每次循环都重新读取 Xform / Color：连点时要把中间态跳掉，
-                //   直接用循环外捕获的值会把旧方向渲染出来
+                // 每次循环都重新读取 Xform / Color：连点时要把中间态跳掉
                 var svg = await Task.Run(() => Views.BuildSvg(_doc!, tab.Kind, Color, Xform));
                 SetSvg(svg, tab);
             }
             while (_rerenderPending);
         }
-        catch (Exception e) { Status = "出错：" + e.Message; }
+        catch (Exception e) { err = e.Message; }
         finally
         {
             Busy = false;
-            Status = Describe(tab);
+            // 出错时保留错误信息，不要被正常描述覆盖掉（否则界面完全无感知）
+            Status = err is { } m ? "出错：" + m : Describe(tab);
         }
     }
 
@@ -542,8 +554,11 @@ public sealed class MainViewModel : Observable
 
         if (opt.Format == ExportFormat.Svg)
         {
-            // SVG 是矢量，「分辨率」对它没有意义 —— 直接用预览那一份文本
-            var svg = tab.Cached ?? Views.BuildSvg(_doc, tab.Kind, opt.Color, Xform);
+            // SVG 是矢量，「分辨率」对它没有意义，因此直接复用预览那一份文本 ——
+            // 但缓存是用画布当前配色建的，用户在对话框里改了配色就必须重建。
+            var svg = opt.Color == Color && tab.Cached is { } cached
+                ? cached
+                : Views.BuildSvg(_doc, tab.Kind, opt.Color, Xform);
             return (System.Text.Encoding.UTF8.GetBytes(svg), "svg");
         }
 

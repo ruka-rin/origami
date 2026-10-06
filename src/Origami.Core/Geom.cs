@@ -277,9 +277,9 @@ public static class Geom
         return o;
     }
 
-    /// <summary>建立 边 -&gt; [面下标] 的索引（边用带容差的规范键）。</summary>
+    /// <summary>建立 边 -> [面下标] 的索引（边用 <see cref="SegKey"/> 的 6 位容差规范键）。</summary>
     public static Dictionary<Segment, List<int>> EdgeFaceIndex(
-        IReadOnlyList<List<Point>> faces, double tol = EpsLoose)
+        IReadOnlyList<List<Point>> faces)
     {
         var ef = new Dictionary<Segment, List<int>>();
         for (int i = 0; i < faces.Count; i++)
@@ -297,9 +297,9 @@ public static class Geom
 
     /// <summary>由折痕边建立对偶图，返回 <c>(dual, creaseOf)</c>。</summary>
     public static (Dictionary<int, List<int>>, Dictionary<(int, int), Segment>) BuildDual(
-        IReadOnlyList<List<Point>> faces, IEnumerable<Segment> fold, double tol = EpsLoose)
+        IReadOnlyList<List<Point>> faces, IEnumerable<Segment> fold)
     {
-        var ef = EdgeFaceIndex(faces, tol);
+        var ef = EdgeFaceIndex(faces);
         var fk = new HashSet<Segment>();
         foreach (var s in fold) fk.Add(s);
 

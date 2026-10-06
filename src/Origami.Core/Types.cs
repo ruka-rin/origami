@@ -37,9 +37,6 @@ public readonly record struct Point(double X, double Y) : IComparable<Point>
 /// </summary>
 public readonly record struct Segment(Point A, Point B)
 {
-    public bool IsVertical => A.X == B.X;
-    public bool IsHorizontal => A.Y == B.Y;
-
     /// <summary>把线段规范成字典序小的端点在前。</summary>
     public static Segment Norm(Point a, Point b) => a <= b ? new Segment(a, b) : new Segment(b, a);
 

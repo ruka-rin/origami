@@ -83,8 +83,16 @@ public sealed class Model
         foreach (var f in model.Folds)
         {
             var (p, q) = f.Seg.A.CompareTo(f.Seg.B) <= 0 ? (f.Seg.A, f.Seg.B) : (f.Seg.B, f.Seg.A);
-            if (Math.Abs(p.X - q.X) < 1e-9) { pipes.Add((int)Math.Round(p.X)); continue; }
+            if (Math.Abs(p.X - q.X) < 1e-9)
+            {
+                // 竖直折痕记的是右邻格；x=0 是纸带左边界，不是折痕，故丢弃
+                int px = (int)Math.Round(p.X);
+                if (px >= 1 && px < n) pipes.Add(px);
+                continue;
+            }
             int k = (int)Math.Round(Math.Min(p.X, q.X));
+            if (k < 0 || k >= n)
+                throw new FormatException($"折痕 {f.Seg} 超出母版长度 {n}");
             // 数学坐标 y 向上：'/' 是 (k,0)->(k+1,1)，两点同号 -> '/'
             cells[k] = (q.Y - p.Y) * (q.X - p.X) > 0 ? '/' : '\\';
         }

@@ -19,8 +19,6 @@ public sealed class SquarePlan
     public Dictionary<(int, int), bool> Horiz { get; set; } = new();
     /// <summary>水平剪切线段起点。</summary>
     public List<(int X, int Y)> CutH { get; set; } = new();
-    public Dictionary<int, (int Start, int End)> PerRow { get; set; } = new();
-    public (int X, int Y)? TailFill { get; set; }
 
     public HashSet<Segment> Cut { get; set; } = new();
     public HashSet<Segment> Fold { get; set; } = new();
@@ -28,21 +26,6 @@ public sealed class SquarePlan
 
     /// <summary>峰谷表 <c>{线段: 'M'|'V'}</c> —— 供折痕图红蓝配色。</summary>
     public Dictionary<Segment, string> FoldMv { get; set; } = new();
-
-    /// <summary>由线段表直接构造并推导 cut/fold/border（供测试与手工构造使用）。</summary>
-    public static SquarePlan FromRawSets(int n, HashSet<Segment> cut, HashSet<Segment> fold,
-                                         HashSet<Segment> border)
-    {
-        var p = new SquarePlan { N = n, Cut = cut, Fold = fold, Border = border };
-        foreach (var ((x, y), sym) in p.Diag)
-        {
-            var (a, b) = sym == '/'
-                ? (new Point(x, y + 1), new Point(x + 1, y))
-                : (new Point(x, y), new Point(x + 1, y + 1));
-            p.Fold.Add(Segment.Norm(a, b));
-        }
-        return p;
-    }
 
     public override string ToString() =>
         $"<SquarePlan N={N} 折{Fold.Count} 剪{Cut.Count} 边{Border.Count}>";
@@ -77,8 +60,10 @@ public static class SquareOps
             {
                 int x = Geom.RoundInt(Math.Min(ax, bx));
                 int y = Geom.RoundInt(Math.Min(ay, by));
-                // 屏幕坐标 y 向下：'/' 视觉上是 (x,y)->(x+1,y+1)
-                p.Diag[(x, y)] = by > ay ? '/' : '\\';
+                // 屏幕坐标 y 向下：'/' 视觉上是 (x,y+1)->(x+1,y)，即 by < ay。
+                // 与 PlanFromSegments 保持同一套约定，否则同一个斜杠在两条生成
+                // 路径上会被标成相反的符号。
+                p.Diag[(x, y)] = by < ay ? '/' : '\\';
             }
         }
 
@@ -147,12 +132,6 @@ public static class SquareOps
         foreach (var seg in SegOrder.Sorted(cut))
             if (Math.Abs(seg.A.Y - seg.B.Y) < Geom.Eps)
                 p.CutH.Add((Geom.RoundInt(seg.A.X), Geom.RoundInt(seg.A.Y)));
-
-        // 末尾回填：末行末格若有一条 '\' 对角且越界
-        int rLast = n - 1;
-        int xEnd = rLast % 2 == 0 ? n - 1 : 0;
-        if (p.Diag.TryGetValue((xEnd, rLast), out var s2) && s2 == '\\')
-            p.TailFill = (xEnd, rLast);
 
         return p;
     }

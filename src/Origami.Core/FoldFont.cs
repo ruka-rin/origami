@@ -163,7 +163,7 @@ public static class FoldFont
                 if (!Encodings.ContainsKey(key)) continue;      // 不支持的字符跳过
 
                 // 每行第一个字符用「词首」变体（若字库提供）
-                if (row == col && col == 0 && !left && Encodings.ContainsKey(key + "start"))
+                if (col == 0 && !left && Encodings.ContainsKey(key + "start"))
                     key += "start";
 
                 line.Append(StripLead(Encodings[key]));
