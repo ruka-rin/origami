@@ -3,10 +3,10 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Origami.Desktop"
-        mc:Ignorable="d" d:DesignWidth="1320" d:DesignHeight="760"
+        mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="720"
         x:Class="Origami.Desktop.MainWindow"
         Title="折纸谜题工具 — 母版到成品"
-        Width="1320" Height="760" MinWidth="900" MinHeight="560"
+        Width="1280" Height="720" MinWidth="900" MinHeight="560"
         Background="{StaticResource Bgc.Base}">
 
   <Window.Styles>
@@ -43,6 +43,10 @@
       <Setter Property="Background" Value="{StaticResource Bgc.Hover}" />
       <Setter Property="TextElement.Foreground" Value="{StaticResource Accent}" />
     </Style>
+    <Style Selector="Button.help:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Bgc.HelpHover}" />
+      <Setter Property="TextElement.Foreground" Value="{StaticResource Accent}" />
+    </Style>
 
     <!-- 帮助按钮：与浮层同色，悬停变强调色 -->
     <Style Selector="Button.help">
@@ -73,18 +77,6 @@
       <Grid Margin="18,12"
             ColumnDefinitions="72,Auto,*"
             RowDefinitions="Auto,Auto,Auto">
-        <Grid.ColumnDefinitions>
-          <!-- 标签列固定宽度：保证「文本」与「母版」两行的输入框左边界一致 -->
-          <ColumnDefinition Width="72" />
-          <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="Auto" MinWidth="0" />
-        </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-
         <!-- 标题行：右侧放主操作 -->
         <TextBlock Grid.Row="0" Grid.ColumnSpan="3" Text="折纸谜题工具"
                    FontSize="14" FontWeight="SemiBold"
@@ -94,7 +86,8 @@
              标签用独立 TextBlock 与开关并排 —— ToggleSwitch 的 Content 会画在滑块旁边，
              两者混成一块。On/Off 置空，说明放 ToolTip。 -->
         <TextBlock Grid.Row="1" Grid.Column="0" Text="文本"
-                   VerticalAlignment="Center" FontSize="12"
+                   VerticalAlignment="Center" FontSize="14"
+                   HorizontalAlignment="Center"
                    Foreground="{StaticResource Fg.Muted}" />
 
         <ToggleSwitch Grid.Row="1" Grid.Column="1"
@@ -117,7 +110,8 @@
 
         <!-- 母版行 -->
         <TextBlock Grid.Row="2" Grid.Column="0" Text="母版"
-                   VerticalAlignment="Center" FontSize="12"
+                   VerticalAlignment="Center" FontSize="14"
+                   HorizontalAlignment="Center"
                    Foreground="{StaticResource Fg.Muted}" Margin="0,10,0,0" />
 
         <TextBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2"
@@ -164,8 +158,8 @@
 
       <!-- 左上角：形状（长条 / 方形）。GroupName 保证两项互斥。 -->
       <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="14"
-              Classes="overlay" Padding="5">
-        <StackPanel Orientation="Horizontal" Spacing="0">
+              Classes="overlay" Padding="5" Background="#333">
+        <StackPanel Orientation="Horizontal" Spacing="0" Opacity="0.8">
           <RadioButton x:Name="ShapeStrip" GroupName="shape"
                        Theme="{StaticResource SegmentOption}" Classes="ghost"
                        Margin="0,0,4,0" Content="长条"
@@ -179,8 +173,8 @@
 
       <!-- 右上角：内容（折痕图 / 成品 / 原子片）+ 上色开关 -->
       <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="14"
-              Classes="overlay" Padding="5">
-        <StackPanel Orientation="Horizontal" Spacing="0">
+              Classes="overlay" Padding="5" Background="#333">
+        <StackPanel Orientation="Horizontal" Spacing="0" Opacity="0.8">
           <RadioButton x:Name="ContentCrease" GroupName="content"
                        Theme="{StaticResource SegmentOption}" Classes="ghost"
                        Margin="0,0,4,0" Content="折痕图"
@@ -212,8 +206,8 @@
 
       <!-- 右下角：画布方向。默认半透明不抢画面，悬停才实心。 -->
       <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="14"
-              Classes="overlay" Padding="10,8">
-        <StackPanel Spacing="7">
+              Classes="overlay" Padding="10,8" Background="#333">
+        <StackPanel Spacing="7" Opacity="0.8">
           <StackPanel Orientation="Horizontal" Spacing="0">
             <Button Classes="dir" Content="↺" Click="OnRotateCcw"
                     IsEnabled="{Binding !Busy}" ToolTip.Tip="逆时针旋转 90°" />
@@ -226,7 +220,7 @@
           </StackPanel>
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock Grid.Column="0" Text="{Binding XformDescription}"
-                       FontSize="10" Foreground="{StaticResource Fg.Faint}"
+                       FontSize="10" Foreground="{StaticResource Fg.RsFaint}"
                        VerticalAlignment="Center" Margin="2,0,10,0" />
             <Button Grid.Column="1" Content="复位" FontSize="10.5" Padding="10,3"
                     Click="OnResetXform" IsEnabled="{Binding CanResetXform}"

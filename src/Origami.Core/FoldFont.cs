@@ -211,8 +211,28 @@ public static class FoldFont
     {
         if (creases.Count < 2) return "";
 
-        int maxX = creases.Max(c => Math.Max(c.Xb, c.Xt));
-        int ncell = maxX / 2;
+        // 母版的格数由**实际折痕**决定，不能用 creases.Max()：
+        // 首尾两个 (x,x) 是哨兵，位置是编码结束时的 x。若编码末尾是
+        // 只前进不落折痕的符号（`_` 前进 2 格），哨兵就会落在最后一条折痕
+        // 之右一格，母版末尾多出一个没有折痕的素格 `.`（如「123456」
+        // 生成的母版以 `|.`结尾）。
+        //
+        // 但也不能只看折痕：全空白输入（如三个空格）没有任何折痕，
+        // 它仍要产出素格 —— 空格在字库里是「留一段白纸」，是有意义的。
+        // 故取「折痕末端」与「有效宽度」两者的较小值：
+        // 有折痕时折痕末端更靠左（去掉尾部空白），
+        // 无折痕时两者相等（保留全部空白格）。
+        int byCrease = 0;
+        for (int i = 1; i < creases.Count - 1; i++)
+        {
+            var (xb, xt) = creases[i];
+            if (xb == xt) byCrease = Math.Max(byCrease, xt / 2);              // 竖折痕
+            else byCrease = Math.Max(byCrease, Math.Min(xb, xt) / 2 + 1);     // 斜折痕
+        }
+
+        // 哨兵位置 = 编码占用的总宽度
+        int bySentinel = creases[^1].Xb / 2;
+        int ncell = byCrease > 0 ? byCrease : bySentinel;
         if (ncell <= 0) return "";
 
         var cells = new char[ncell];

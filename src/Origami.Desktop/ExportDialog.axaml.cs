@@ -46,8 +46,14 @@ public partial class ExportDialog : Window
 
         // 原子片分解本来每面一色，配色选项对它无意义
         bool canColor = tab?.SupportsColor ?? true;
-        ColorRadio.IsEnabled = canColor;
-        PlainRadio.IsEnabled = canColor;
+        if (!canColor)
+        {
+            //ColorRadio.IsEnabled = canColor;
+            //PlainRadio.IsEnabled = canColor;
+            ColorPanel.IsVisible = canColor;
+            Height -= 70;
+        }
+        
         if (!canColor)
         {
             ColorRadio.IsChecked = true;          // 只是让取值合法

@@ -2,9 +2,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="380"
+        mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="360"
         x:Class="Origami.Desktop.ExportDialog"
-        Title="导出" Width="420" Height="400"
+        Title="导出" Width="420" Height="360"
         CanResize="False" ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource Bgc.Chrome}">
@@ -37,7 +37,7 @@
     </StackPanel>
 
     <!-- 配色 -->
-    <StackPanel Grid.Row="2" Margin="0,18,0,0" Spacing="0">
+    <StackPanel x:Name="ColorPanel" Grid.Row="2" Margin="0,18,0,0" Spacing="0">
       <TextBlock Classes="section" Text="配色" />
       <Grid ColumnDefinitions="*,*">
         <RadioButton x:Name="ColorRadio" Grid.Column="0" GroupName="clr"

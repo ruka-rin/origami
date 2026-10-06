@@ -106,6 +106,60 @@ public class FoldFontTests
         Assert.All(blanks, c => Assert.Equal('.', c));
     }
 
+    /// <summary>
+    /// 母版不应以<b>没有折痕的素格</b>结尾。
+    /// <para>
+    /// 编码末尾的 <c>_</c> 会「前进两格但不留折痕」，而折痕转母版时若用
+    /// 编码总宽度（含首尾哨兵）算格数，末尾就会多出一个素格 ——
+    /// 表现为「123456」生成的母版以 <c>|.</c> 结尾。多出的素格不含折痕，
+    /// 折叠时是一段没被折的纸尾，属于缺陷而非无害的补白。
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData("123456")]
+    [InlineData("A")]
+    [InlineData("1")]
+    [InlineData("HELLO")]
+    [InlineData("ABCDEF")]
+    [InlineData("KRENIO")]
+    public void 母版不以素格结尾(string text)
+    {
+        string master = FoldFont.TextToMaster(text);
+        Assert.NotEqual("", master);
+        Assert.False(master.EndsWith('.'), $"「{text}」的母版以素格结尾：…{master[^6..]}");
+    }
+
+    /// <summary>
+    /// 母版末尾不应有素格，但<b>不能因此丢格</b>。
+    /// <para>
+    /// 修复「末尾多一个素格」时，最容易犯的错是顺手把整段尾部空白也砍掉 ——
+    /// 空格在字库里是「留一段白纸」，是有语义的字符，砍掉等于丢内容。
+    /// 这里对比加/ 不加尾部空格：格数应<b>相差空格占的格数</b>，
+    /// 且原有那些层的层序必须完全一致。
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void 尾部空格占格且不影响原有层序()
+    {
+        string bare = FoldFont.TextToMaster("KRENIO");
+        string padded = FoldFont.TextToMaster("KRENIO ");
+
+        var m1 = Master.ParseMaster(bare);
+        var m2 = Master.ParseMaster(padded);
+
+        // 空格在字库编码里是 `_`，每 2 个 `_` 前进 1 格
+        Assert.True(m2.NCell > m1.NCell, "尾部空格应占据额外的格");
+        Assert.Equal(bare, padded[..bare.Length]);   // 尾部追加，前缀不变
+
+        var a = FoldOps.FoldStrip(m1, MasterOps.DefaultMv(m1.Pipes.Count + m1.NCell));
+        var b = FoldOps.FoldStrip(m2, MasterOps.DefaultMv(m2.Pipes.Count + m2.NCell));
+
+        // 前若干层的层序不受尾部影响 —— 折出来的字母主体不变
+        int n = Math.Min(a.Rank.Count, b.Rank.Count);
+        Assert.True(n > 0);
+        Assert.Equal(a.Rank.Take(n), b.Rank.Take(n));
+    }
+
     /// <summary>多行文本：奇数行按开关镜像或反转，行间补转折折痕。</summary>
     [Fact]
     public void 多行文本两种模式都能生成合法母版()
