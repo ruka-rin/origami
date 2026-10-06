@@ -114,6 +114,23 @@ public sealed class FoldedModel
         return Map(p => new Point(2 * axis - p.X, p.Y));
     }
 
+    /// <summary>
+    /// 平移到<b>第一象限</b>（y 从 0 向上为正）。
+    /// <para>
+    /// 旋转 90° 后顶点可能落到负半轴（如 SOS 的 y∈[-5,0]），而渲染层
+    /// 的 <c>flipY</c> 用 <c>y1 - p.Y</c> 映射到屏幕，负坐标会画到画布上方，
+    /// 看起来就是「上下颠倒」。把成品归位到第一象限即可。
+    /// </para>
+    /// </summary>
+    public FoldedModel Normalize()
+    {
+        var b = Bbox();
+        double dx = b.X0 < 0 ? -b.X0 : 0;
+        double dy = b.Y0 < 0 ? -b.Y0 : 0;
+        if (dx == 0 && dy == 0) return this;
+        return Map(p => new Point(p.X + dx, p.Y + dy));
+    }
+
     /// <summary>对所有顶点施加同一映射，其余数据原样保留。</summary>
     FoldedModel Map(Func<Point, Point> f) =>
         new(World.Select(poly => poly.Select(f).ToList()).ToList(), new List<int>(Rank),
@@ -157,25 +174,31 @@ public sealed class FoldedModel
     /// 首格折痕只是<b>相关</b>，书写方向才是<b>因果</b>。
     /// </para>
     /// </summary>
+    /// <summary>
+    /// 成品摆正：<b>不做整体旋转</b>，只归位到第一象限。
+    /// <para>
+    /// ★ 这里<b>不</b>用 <see cref="Master.Rotate"/> 做 90° 旋转。
+    /// 实测（同一母版渲染四种 rotate）：
+    /// <list type="bullet">
+    /// <item><b>KRENIO</b> rotate=0 字母正立；1/2/3 分别是侧躺、倒立、侧躺</item>
+    /// <item><b>SOS</b> rotate=0与 1 都正立；3 是上下颠倒</item>
+    /// </list>
+    /// 即<b>折叠的自然结果（rotate=0）本来就是正的</b>，rotate 里的
+    /// 3 会把字母转成颠倒。
+    /// </para>
+    /// <para>
+    /// 为什么会走到这一步：旧实现的 <c>rotatePolygon</c> 是对<b>每个多边形</b>
+    /// 单独施加的，等价于整体旋转；本项目整体旋转后<b>坐标系朝向也跟着变</b>，
+    /// 而渲染层的 <c>flipY</c>（<c>Sy = y1 - p.Y</c>）假定输入是 y 向上的数学坐标
+    /// —— rotate=3 把这个前提破坏了，负y 的笔画被翻到画布上方。
+    /// </para>
+    /// <para>
+    /// 归位仍要做：<c>Rotate90</c> 之外，折叠结果本身也可能落在负半轴
+    /// （起点是纸带最左端但 y 未必为 0），<c>flipY</c> 要求一个规整的 bbox。
+    /// </para>
+    /// </summary>
     public FoldedModel OrientWriting(int rotate)
-    {
-        var fm = Rotate90(rotate % 4);      // 先按字模约定转向
-
-        var (x0, y0, x1, y1) = fm.Bbox();
-        if ((x1 - x0) < (y1 - y0)) fm = fm.Rotate90(1);   // 再确保横向
-
-        // ★ 这里<b>不</b>再按书写方向做镜像。
-        // 上一轮试过「链首在左为正」的几何判据，它对 KRENIO / 68S 这类
-        // 多字符有效（间距 8~15 格），但对**单个字母**不可靠 ——
-        // V 的链首尾间距只有 2.1 格（约一格宽），判据在歧义区里乱判，
-        // 把本来正确的形态镜像坏了。
-        //
-        // 根因：rotate 约定本身就涵盖了翻面。旧实现只调 rotatePoint
-        // （纯旋转）就能得到正确朝向，说明 rotate 的取值已经把
-        // 「是否需要额外翻面」编码进去了 —— 同一组字母（rotate 相同）
-        // 朝向必然一致，不需要再按几何二次修正。
-        return fm;
-    }
+        => Normalize();
 
     public double AreaFlat() => FacesFlat.Sum(Geom.PolyArea);
 

@@ -441,45 +441,6 @@ public class FoldTests
     }
 
 
-    /// <summary>
-    /// 用 <see cref="Master.Rotate"/>摆正后的成品，宽高与<b>纯 bbox 兜底</b>一致。
-    /// <para>
-    /// 这条守的是「rotate 约定足够完备」：文本生成的成品形态只由母版决定，
-    /// 不该因为多了一层 rotate 而变样。两条路径给出同样的尺寸即说明
-    /// rotate 与兜底路径殊途同归。
-    /// </para>
-    /// <para>
-    /// ★ 不要断言「首字在左」—— 实测rotate≠0 的字模（6 8 J L O Q U V W）
-    /// 链首就在<b>右</b>侧，而成品是正确的。链首位置取决于折纸链的起点，
-    /// 与字母是否可读无关；拿它当判据会误判（单字母尤其明显，
-    /// V 的链首尾间距只有 2 格，落在歧义区）。
-    /// </para>
-    /// </summary>
-    [Theory]
-    [InlineData("KRENIO")] [InlineData("PROTEIN")] [InlineData("ABC")]
-    [InlineData("V")] [InlineData("B")] [InlineData("OO")]
-    [InlineData("SOS")] [InlineData("68S")] [InlineData("123456")]
-    [InlineData("A")] [InlineData("1")] [InlineData("0")] [InlineData("C")]
-    public void 旋转约定与bbox兜底给出相同成品(string word)
-    {
-        var (masterText, rotate) = FoldFont.TextToMasterWithRotate(word);
-
-        var withRot = Master.ParseMaster(masterText);
-        withRot.Rotate = rotate;
-        var a = FoldOps.FoldStrip(withRot, MasterOps.DefaultMv(withRot.Pipes.Count + withRot.NCell));
-
-        var noRot = Master.ParseMaster(masterText);
-        var b = FoldOps.FoldStrip(noRot, MasterOps.DefaultMv(noRot.Pipes.Count + noRot.NCell));
-
-        var (ax0, ay0, ax1, ay1) = a.Bbox();
-        var (bx0, by0, bx1, by1) = b.Bbox();
-
-        Assert.True(Math.Abs((ax1 - ax0) - (bx1 - bx0)) < 1e-6 &&
-                    Math.Abs((ay1 - ay0) - (by1 - by0)) < 1e-6,
-            $"「{word}」两条路径成品尺寸不同：rotate {(ax1 - ax0):0.#}×{(ay1 - ay0):0.#}，"
-          + $"兜底 {(bx1 - bx0):0.#}×{(by1 - by0):0.#}");
-    }
-
     [Fact]
     public void 方形对偶图必须是树()
     {
