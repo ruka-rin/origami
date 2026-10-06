@@ -1,0 +1,21 @@
+## 构建产物
+bin/
+obj/
+
+## IDE
+.idea/
+.vs/
+.vscode/
+*.user
+*.suo
+
+## 测试/覆盖率
+TestResults/
+*.trx
+coverage*.xml
+
+## 临时与系统文件
+*.tmp
+*.bak
+Thumbs.db
+.DS_Store

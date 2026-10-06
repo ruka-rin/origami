@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Origami.Desktop</RootNamespace>
+    <AssemblyName>origami-ui</AssemblyName>
+    <StartupObject>Origami.Desktop.Program</StartupObject>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+  </PropertyGroup>
+
+  <!--
+    ★ 这里<b>没有</b> NoWarn 抑制 AVLN3001：之前是靠压制警告绕过去的，
+    正确的做法是给 ExportDialog 加无参构造（设计器也需要它），警告自然消失。
+  -->
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.2.3" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.2.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.3" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Origami.Core\Origami.Core.csproj" />
+  </ItemGroup>
+
+  <!--
+    ★ 让测试能看见 SvgNode 的具体类型（SvgRect / SvgLine / SvgPolygon）。
+      这些类型刻意是 internal —— 它们是预览渲染的实现细节，不是对外 API。
+      但「方向变换有没有真的作用到图元坐标上」这件事，只能从类型内部观察
+      （比对 X/Y/Width/Height），把它们改成 public 就为了测试并不划算，
+      所以这里开一个测试可见性，而不是放宽API。
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Origami.Tests" />
+  </ItemGroup>
+
+</Project>

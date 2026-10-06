@@ -1,0 +1,55 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Origami.Desktop"
+        mc:Ignorable="d" d:DesignWidth="440" d:DesignHeight="380"
+        x:Class="Origami.Desktop.ExportDialog"
+        Title="导出" Width="440" Height="390"
+        CanResize="False" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#1E1E24">
+
+  <StackPanel Margin="20" Spacing="14">
+
+    <TextBlock x:Name="TitleText" FontSize="15" FontWeight="SemiBold"
+               Foreground="#E4E7EC" />
+
+    <!-- 格式 -->
+    <TextBlock Text="格式" FontSize="11" Foreground="#6E7480" />
+    <StackPanel Orientation="Horizontal" Spacing="0">
+      <RadioButton x:Name="SvgRadio" Content="SVG（矢量，无损放大）"
+                   GroupName="fmt" Margin="0,0,18,0" />
+      <RadioButton x:Name="PngRadio" Content="PNG（位图）" GroupName="fmt" />
+    </StackPanel>
+
+    <!-- 配色 -->
+    <TextBlock Text="配色" FontSize="11" Foreground="#6E7480" />
+    <StackPanel Orientation="Horizontal" Spacing="0">
+      <RadioButton x:Name="ColorRadio" Content="彩色" GroupName="clr" Margin="0,0,18,0" />
+      <RadioButton x:Name="PlainRadio" Content="黑白 / 剪影" GroupName="clr" />
+    </StackPanel>
+
+    <!-- 分辨率：仅 PNG -->
+    <StackPanel x:Name="ScalePanel" Spacing="6">
+      <TextBlock Text="分辨率" FontSize="11" Foreground="#6E7480" />
+      <ComboBox x:Name="ScaleBox" SelectedIndex="1" HorizontalAlignment="Stretch">
+        <ComboBoxItem Content="1× 标准" Tag="1" />
+        <ComboBoxItem Content="2× 高清（推荐）" Tag="2" />
+        <ComboBoxItem Content="4× 超高（放大细看 / 印刷）" Tag="4" />
+      </ComboBox>
+      <TextBlock x:Name="SizeHint" FontSize="10" Foreground="#6E7480" />
+    </StackPanel>
+
+    <TextBlock x:Name="VectorNote" FontSize="10" Foreground="#6E7480"
+               TextWrapping="Wrap" LineHeight="15"
+               Text="SVG 是矢量格式，放大不会失真，因此没有分辨率选项。" />
+
+    <Rectangle Height="1" Fill="#2A2A32" />
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="取消" HorizontalContentAlignment="Center" MinWidth="96" Click="OnCancel" />
+      <Button Content="导出" HorizontalContentAlignment="Center" MinWidth="96" Click="OnExport" IsDefault="True" />
+    </StackPanel>
+  </StackPanel>
+</Window>

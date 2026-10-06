@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Origami.Tests</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Origami.Core\Origami.Core.csproj" />
+    <!-- GUI 侧的纯逻辑（视口缩放/平移、SVG 导入判定）也要能测，
+         所以引用 Desktop 程序集。这些类型不碰 Avalonia 控件状态，
+         在无显示环境下也能实例化和调用。 -->
+    <ProjectReference Include="..\..\src\Origami.Desktop\Origami.Desktop.csproj" />
+  </ItemGroup>
+
+  <!-- 权威题面基准（方形 CP 折痕图），作为回归测试的黄金样本 -->
+  <ItemGroup>
+    <None Include="square_truth.svg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="square_truth_protein.svg" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

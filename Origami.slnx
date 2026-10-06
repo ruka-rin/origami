@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Origami.Cli/Origami.Cli.csproj" />
+    <Project Path="src/Origami.Core/Origami.Core.csproj" />
+    <Project Path="src/Origami.Desktop/Origami.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Origami.Tests/Origami.Tests.csproj" />
+  </Folder>
+</Solution>
