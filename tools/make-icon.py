@@ -20,10 +20,30 @@ import struct
 import subprocess
 import tempfile
 
-TMP = r"C:\Users\Administrator\AppData\Local\Temp\icongen"
-EDGE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-SVG = os.path.join(TMP, "icon.svg")
-ASSETS = r"G:\LLM\WorkBuddy_Space\代码编写1\origami\src\Origami.Desktop\Assets"
+# 路径全部从脚本自身位置推导，不写死绝对路径 —— 换机器/ 换目录也能跑
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ASSETS = os.path.join(ROOT, "src", "Origami.Desktop", "Assets")
+SVG_SRC = os.path.join(ASSETS, "icon.svg")
+
+# 中间产物落在系统临时目录，不污染仓库
+TMP = os.path.join(tempfile.gettempdir(), "origami-icon-build")
+os.makedirs(TMP, exist_ok=True)
+
+# 渲染器：Edge 优先，其次 Chrome
+EDGE = next(
+    (p for p in [
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    ] if os.path.exists(p)),
+    None,
+)
+if EDGE is None:
+    raise SystemExit("找不到 Edge 或 Chrome，无法渲染 SVG")
+
+# 渲染用的 SVG 副本（HTML 里以相对路径引用）
+shutil.copy(SVG_SRC, os.path.join(TMP, "icon.svg"))
 
 # Windows 会按 DPI 与场景挑选：16 任务栏、32 任务栏(大)、48/64 资源管理器、
 # 128/256 高DPI 与大图标预览
