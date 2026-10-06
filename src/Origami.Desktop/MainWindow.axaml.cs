@@ -65,10 +65,18 @@ public partial class MainWindow : Window
     /// <summary>母版框失去焦点即渲染。</summary>
     async void OnMasterLostFocus(object? sender, RoutedEventArgs e) => await RebuildAsync();
 
-    /// <summary>文本框回车即生成母版并渲染。</summary>
+    /// <summary>
+    /// 文本框用 <b>Ctrl+Enter</b> 提交，不用裸回车 ——
+    /// 文本框是多行的（支持分行折蛇形），裸回车必须留给换行，
+    /// 否则用户没法输入多行文本。
+    /// </summary>
     async void OnTextKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
+
+        var mods = (e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Meta)) != 0;
+        if (!mods) return;                 // 裸回车：换行，放行
+
         e.Handled = true;
         await _vm.GenerateFromTextAsync();
     }

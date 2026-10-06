@@ -73,13 +73,16 @@
     <!-- 输入 -->
     <StackPanel Grid.Row="3" Margin="0,20,0,0" Spacing="0">
       <TextBlock Classes="section" Text="输入" />
-      <Grid ColumnDefinitions="128,*" RowDefinitions="Auto,Auto">
+      <Grid ColumnDefinitions="128,*" RowDefinitions="Auto,Auto,Auto">
         <TextBlock Grid.Row="0" Grid.Column="0" Classes="k" Text="母版框" />
         <TextBlock Grid.Row="0" Grid.Column="1" Classes="v"
                    Text="回车或点别处即渲染" />
         <TextBlock Grid.Row="1" Grid.Column="0" Classes="k" Text="文本框" Margin="0,7,0,0" />
         <TextBlock Grid.Row="1" Grid.Column="1" Classes="v" Margin="0,7,0,0"
-                   Text="由折纸字库生成母版，写进母版框（支持 A-Z 0-9 与空格）" />
+                   Text="由折纸字库生成母版，写进母版框。支持 A-Z 0-9 与空格" />
+        <TextBlock Grid.Row="2" Grid.Column="0" Classes="k" Text="分行" Margin="0,7,0,0" />
+        <TextBlock Grid.Row="2" Grid.Column="1" Classes="v" Margin="0,7,0,0"
+                   Text="文本框可分多行，各行沿长条交替折成蛇形。回车换行，Ctrl+Enter 生成母版" />
       </Grid>
     </StackPanel>
 

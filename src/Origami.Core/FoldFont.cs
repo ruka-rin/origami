@@ -168,10 +168,19 @@ public static class FoldFont
             string lineEnc = line.ToString();
 
             if (row % 2 == 1 - parity)
-                lineEnc = mirror ? $"#{lineEnc}#" : Reverse(lineEnc);
+            {
+                // 镜像行前后各加 #（翻面标记），且**前面还要加一个 _**（对齐余量）——
+                // 这两个符号缺一不可：少了 _ 会让镜像行比反转行短一格，
+                // 多行文本折出来的字母会错位（旧实现是 `#_${lineEnc}#`）。
+                lineEnc = mirror ? $"#_{lineEnc}#" : Reverse(lineEnc);
+            }
 
+            // 行间转折符：斜杠串的<b>末尾只有一个</b>反斜杠。
+            // 旧实现写的是 JS 的 '_/_____\\_'，求值后是「_/」加 5 下划线加 1 反斜杠
+            // （共 8 字符）—— 这里曾误写成两个反斜杠，多行文本的中间行就会
+            // 多出一道斜折痕，母版多一格、折出的字母错位。
             if (row < lines.Count - 1)
-                lineEnc += row % 2 == parity ? "\\_____/" : "_/_____\\\\_";
+                lineEnc += row % 2 == parity ? "\\_____/" : "_/_____\\_";
 
             sb.Append(lineEnc);
         }

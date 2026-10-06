@@ -117,7 +117,7 @@ public sealed class MainViewModel : Observable
     }
 
     /// <summary>文本输入框的水印提示。</summary>
-    public const string TextWatermark = "普通文本，如 KRENIO（字库支持 A-Z 0-9 与空格）";
+    public const string TextWatermark = "普通文本，可分行（字库支持 A-Z 0-9 与空格）";
 
     /// <summary>
     /// 由折纸字库把文本输入框的内容编成母版串，<b>写进母版框</b>并重渲。

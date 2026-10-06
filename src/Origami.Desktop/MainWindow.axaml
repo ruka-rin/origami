@@ -97,16 +97,21 @@
                       VerticalAlignment="Center" Margin="0,0,10,0"
                       ToolTip.Tip="打开后右边出现文本输入框，输入普通文本（如 KRENIO）由折纸字库生成母版" />
 
+        <!-- 文本行。多行文本框：折蛇形需要分行输入，回车用来换行，
+             Ctrl+Enter 才提交（见 code-behind 的 OnTextKeyDown）。
+             高度随行数增长，4 行足够常见场景又不至于把母版框挤走。 -->
         <TextBox Grid.Row="1" Grid.Column="2" x:Name="TextBox"
                  Text="{Binding TextInput}"
                  Watermark="{Binding TextWatermark}"
                  FontFamily="Consolas,Menlo,DejaVu Sans Mono,monospace"
                  FontSize="13"
-                 AcceptsReturn="False"
+                 MinHeight="84" MaxHeight="180"
+                 AcceptsReturn="True" TextWrapping="NoWrap"
+                 VerticalContentAlignment="Top"
                  KeyDown="OnTextKeyDown" LostFocus="OnTextLostFocus"
                  IsVisible="{Binding IsTextMode}"
                  IsEnabled="{Binding !Busy}"
-                 ToolTip.Tip="回车或点别处即生成母版，结果写进下面的母版框" />
+                 ToolTip.Tip="可分行输入（分行会折成蛇形）。Ctrl+Enter 或点别处即生成母版" />
 
         <!-- 母版行 -->
         <TextBlock Grid.Row="2" Grid.Column="0" Text="母版"
