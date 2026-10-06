@@ -11,21 +11,25 @@
 
   <Window.Styles>
     <!--
-      画布浮层：平时半透明、不抢画面，鼠标移上去才实心。
-      好处是画布没有任何常驻边框，信息（折痕图）才是主角。
+      画布浮层：实心面板 + 淡边框，与画布底色有明确层次。
+      之前用 #B01A1A1F（半透明），实测在深色画布上几乎看不出来，
+      浮层像是「悬空」且点不准 —— 半透明压低了对比度。
+
+      常驻时已是实心够亮的深灰（#26262C），悬停再提亮一档，
+      这样既不喧宾夺主，又能第一眼看到控件在哪。
     -->
     <Style Selector="Border.overlay">
-      <Setter Property="Background" Value="#B01A1A1F" />
+      <Setter Property="Background" Value="#26262C" />
       <Setter Property="CornerRadius" Value="{StaticResource Rounded.Panel}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="BorderBrush" Value="#00FFFFFF" />
+      <Setter Property="BorderBrush" Value="#3A3A44" />
     </Style>
     <Style Selector="Border.overlay:pointerover">
-      <Setter Property="Background" Value="#F21E1E24" />
-      <Setter Property="BorderBrush" Value="{StaticResource Bdr.Hairline}" />
+      <Setter Property="Background" Value="#30303A" />
+      <Setter Property="BorderBrush" Value="#4A4A57" />
     </Style>
 
-    <!-- 方向按钮：等宽等高成组，默认弱化，悬停高亮 -->
+    <!-- 方向按钮：等宽等高成组，悬停高亮 -->
     <Style Selector="Button.dir">
       <Setter Property="Width" Value="34" />
       <Setter Property="Height" Value="30" />
@@ -33,21 +37,24 @@
       <Setter Property="Margin" Value="0,0,6,0" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="FontSize" Value="14" />
+      <Setter Property="Foreground" Value="{StaticResource Fg.Strong}" />
     </Style>
     <Style Selector="Button.dir:pointerover /template/ ContentPresenter">
       <Setter Property="Background" Value="{StaticResource Bgc.Hover}" />
+      <Setter Property="TextElement.Foreground" Value="{StaticResource Accent}" />
     </Style>
 
-    <!-- 帮助按钮 -->
+    <!-- 帮助按钮：与浮层同色，悬停变强调色 -->
     <Style Selector="Button.help">
-      <Setter Property="Background" Value="#B01A1A1F" />
+      <Setter Property="Background" Value="#26262C" />
       <Setter Property="Width" Value="28" />
       <Setter Property="Height" Value="28" />
       <Setter Property="Padding" Value="0" />
       <Setter Property="FontSize" Value="13" />
       <Setter Property="CornerRadius" Value="14" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="BorderBrush" Value="#00FFFFFF" />
+      <Setter Property="BorderBrush" Value="#3A3A44" />
+      <Setter Property="Foreground" Value="{StaticResource Fg.Muted}" />
     </Style>
     <Style Selector="Button.help:pointerover">
       <Setter Property="Background" Value="{StaticResource Accent}" />
@@ -70,7 +77,7 @@
           <!-- 标签列固定宽度：保证「文本」与「母版」两行的输入框左边界一致 -->
           <ColumnDefinition Width="72" />
           <ColumnDefinition Width="Auto" />
-          <ColumnDefinition Width="*" MinWidth="0" />
+          <ColumnDefinition Width="Auto" MinWidth="0" />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />

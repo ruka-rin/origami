@@ -24,7 +24,7 @@
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="FontSize" Value="12" />
-      <Setter Property="Foreground" Value="{StaticResource Fg.Base}" />
+      <Setter Property="Foreground" Value="{StaticResource Fg.Strong}" />
       <Setter Property="Template">
         <ControlTemplate>
           <Border Background="{TemplateBinding Background}"
@@ -32,7 +32,15 @@
                   BorderThickness="{TemplateBinding BorderThickness}"
                   CornerRadius="{TemplateBinding CornerRadius}"
                   Padding="{TemplateBinding Padding}">
-            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <!-- Content 必须显式接TemplateBinding.Content：
+                 不写的话 ContentPresenter 拿到的是空内容，文字完全不显示
+                 （ControlPresenter 没有默认继承 Content）。 -->
+            <ContentPresenter Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                              TextBlock.Foreground="{TemplateBinding Foreground}"
+                              TextBlock.FontSize="{TemplateBinding FontSize}" />
           </Border>
         </ControlTemplate>
       </Setter>
@@ -51,11 +59,12 @@
   </Styles.Resources>
 
   <!--
-    画布上的分段选择器：默认弱化（半透明），悬停才清晰 ——
-    画布的主角是折痕图本身，控件不该一直抢注意力。
+    画布上的分段选择器：默认略弱化，悬停恢复全亮——
+    画布的主角是折痕图，控件不该一直抢注意力，但也不能弱到看不清文字。
+    先前用 0.72 的不透明度，在深色面板上文字发灰、几乎读不出来。
   -->
   <Style Selector="RadioButton.ghost">
-    <Setter Property="Opacity" Value="0.75" />
+    <Setter Property="Opacity" Value="0.88" />
   </Style>
   <Style Selector="RadioButton.ghost:pointerover">
     <Setter Property="Opacity" Value="1" />

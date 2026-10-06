@@ -11,6 +11,13 @@ public partial class MainWindow : Window
 {
     readonly MainViewModel _vm = new();
 
+    /// <summary>
+    /// 画布上的两组视图单选（形状 / 内容）。
+    /// <para>暴露出来给测试用：这类「能加载但文字为空」的缺陷，
+    /// XAML 编译器与「窗口能否 Show」的冒烟测试都发现不了，只能直接查控件。</para>
+    /// </summary>
+    public IReadOnlyList<RadioButton> ViewOptions => new[] { ShapeStrip, ShapeSquare, ContentCrease, ContentFolded, ContentPieces };
+
     public MainWindow()
     {
         // 不要自己写 InitializeComponent() —— XAML 编译器生成的同名方法还负责

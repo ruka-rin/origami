@@ -45,6 +45,66 @@ public class UiSmokeTests
         win.Close();
     }
 
+    /// <summary>
+    /// 导出对话框与主窗口里的选项都要有<b>可见文字</b>。
+    /// <para>
+    /// 曾经把 RadioButton 做成卡片时，ControlTemplate 里的 ContentPresenter
+    /// 忘了写 <c>Content="{TemplateBinding Content}"</c> —— ContentPresenter
+    /// 不会默认继承 Content，于是文字全空、只剩一个彩色方块。
+    /// XAML 编译器和「窗口能否加载」的冒烟测试都发现不了这种
+    /// 「能加载但没内容」的缺陷，所以这里断言 Content 非空且控件有宽度。</para>
+    /// </summary>
+    [AvaloniaFact]
+    public void 导出选项带有可见文字()
+    {
+        var vm = new MainViewModel();
+        var dlg = new ExportDialog(vm.ViewTabs[0], ColorMode.Peaks, new Size(1200, 1200));
+        dlg.Show();
+        dlg.Measure(new Size(420, 400));
+        dlg.Arrange(new Rect(0, 0, 420, 400));
+        dlg.UpdateLayout();
+
+        foreach (var (rb, expected) in new[]
+                 {
+                     (dlg.SvgRadio, "SVG 矢量"),
+                     (dlg.PngRadio, "PNG 位图"),
+                     (dlg.ColorRadio, "彩色"),
+                     (dlg.PlainRadio, "黑白 / 剪影"),
+                 })
+        {
+            Assert.Equal(expected, rb.Content);
+            // 文字为空时控件宽度会塌成 0，有文字则必有宽度
+            Assert.True(rb.Bounds.Width > 0,
+                $"{expected} 没有可见宽度 —— ContentPresenter 可能没接上 Content");
+        }
+
+        dlg.Close();
+    }
+
+    /// <summary>主窗口画布上的五个视图选项都要有可见文字。</summary>
+    [AvaloniaFact]
+    public void 画布视图选项带有可见文字()
+    {
+        var win = new MainWindow();
+        win.Show();
+        win.Measure(new Size(1320, 760));
+        win.Arrange(new Rect(0, 0, 1320, 760));
+        win.UpdateLayout();
+
+        var expected = new[] { "长条", "方形", "折痕图", "成品", "原子片" };
+        Assert.Equal(expected.Length, win.ViewOptions.Count);
+
+        for (int i = 0; i < win.ViewOptions.Count; i++)
+        {
+            var rb = win.ViewOptions[i];
+            Assert.Equal(expected[i], rb.Content);
+            Assert.True(rb.Bounds.Width > 0,
+                $"「{expected[i]}」没有可见宽度 —— ContentPresenter 可能没接上 Content");
+        }
+
+        win.Close();
+    }
+
     [AvaloniaFact]
     public void 导出对话框能加载()
     {
