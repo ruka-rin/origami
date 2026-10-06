@@ -106,6 +106,77 @@ public sealed class FoldedModel
         return (square || (a1 - a0) > (b1 - b0)) ? cand : this;
     }
 
+    /// <summary>沿 y 轴镜像（左右翻转）。</summary>
+    public FoldedModel MirrorAcrossY()
+    {
+        var b = Bbox();
+        double axis = (b.X0 + b.X1) / 2;
+        return Map(p => new Point(2 * axis - p.X, p.Y));
+    }
+
+    /// <summary>对所有顶点施加同一映射，其余数据原样保留。</summary>
+    FoldedModel Map(Func<Point, Point> f) =>
+        new(World.Select(poly => poly.Select(f).ToList()).ToList(), new List<int>(Rank),
+            new Dictionary<int, string>(MvMap),
+            new List<string>(MvSeq),
+            FacesFlat.Select(poly => poly.Select(f).ToList()).ToList(),
+            new List<Segment>(Creases), Groups);
+
+    /// <summary>
+    /// 成品上书写方向是否自左向右 —— 折痕链的前段落在长轴左端。
+    /// <para>
+    /// 取链首尾各 1/4 的面片，比较顶点质心在长轴上的位置。
+    /// 用 1/4 而不是单个面片：单片可能只是局部笔画像画到中间，取平均更稳。
+    /// </para>
+    /// </summary>
+    public bool IsWritingLeftToRight()
+    {
+        if (World.Count < 4) return true;      // 面片太少，无从判断，保持原样
+
+        int q = Math.Max(1, World.Count / 4);
+        var head = World.Take(q).SelectMany(f => f);
+        var tail = World.Skip(World.Count - q).SelectMany(f => f);
+        return head.Average(p => p.X) < tail.Average(p => p.X);
+    }
+
+    /// <param name="rotate">母版声明的旋转次数（<see cref="Master.Rotate"/>，0..3）。</param>
+    /// <summary>
+    /// 把成品摆成<b>统一的书写朝向</b>：横向，且<b>首字在左</b>。
+    /// <para>
+    /// 光靠 <see cref="Master.Rotate"/>（90° 旋转）不够：rotate=1 的字模
+    /// （6 8 J L O Q U V W）转完后 bbox 与 rotate=0 同样大小，
+    /// 却<b>左右翻转</b> —— 视觉上是两个不同的字。这就是「除了转向还有翻面」。
+    /// </para>
+    /// <para>
+    /// 判据用<b>书写方向</b>这个几何事实：折纸链沿 x 推进，成品上链首与链尾
+    /// 在长轴上的相对位置就标出了书写方向。不对就镜像一次。
+    /// </para>
+    /// <para>
+    /// ★ 判据不能换成「首格折痕是 / 还是 \」—— 实测二者<b>并无</b>对应关系：
+    /// 首格同为 '/' 的 A 与 M 方向相反，首格为 '\' 的 S 反而是正的。
+    /// 首格折痕只是<b>相关</b>，书写方向才是<b>因果</b>。
+    /// </para>
+    /// </summary>
+    public FoldedModel OrientWriting(int rotate)
+    {
+        var fm = Rotate90(rotate % 4);      // 先按字模约定转向
+
+        var (x0, y0, x1, y1) = fm.Bbox();
+        if ((x1 - x0) < (y1 - y0)) fm = fm.Rotate90(1);   // 再确保横向
+
+        // ★ 这里<b>不</b>再按书写方向做镜像。
+        // 上一轮试过「链首在左为正」的几何判据，它对 KRENIO / 68S 这类
+        // 多字符有效（间距 8~15 格），但对**单个字母**不可靠 ——
+        // V 的链首尾间距只有 2.1 格（约一格宽），判据在歧义区里乱判，
+        // 把本来正确的形态镜像坏了。
+        //
+        // 根因：rotate 约定本身就涵盖了翻面。旧实现只调 rotatePoint
+        // （纯旋转）就能得到正确朝向，说明 rotate 的取值已经把
+        // 「是否需要额外翻面」编码进去了 —— 同一组字母（rotate 相同）
+        // 朝向必然一致，不需要再按几何二次修正。
+        return fm;
+    }
+
     public double AreaFlat() => FacesFlat.Sum(Geom.PolyArea);
 
     public double AreaFolded() => World.Sum(Geom.PolyArea);
@@ -420,9 +491,11 @@ public static class FoldOps
         var fm = new FoldedModel(world, rank, mvMap, mv.ToList(), faces, creases);
         if (!orient) return fm;
 
-        // 字模编码里带了旋转次数就用它 —— 确定性，不会摇摆
-        if (master.Rotate > 0) return fm.Rotate90(master.Rotate % 4);
+        // 有编码来源（文本生成）-> 用字模的 rotate 约定 + 书写方向判据，
+        // 两者都是确定性的，不会像 bbox 猜法那样在正方形上摇摆
+        if (master.Rotate > 0) return fm.OrientWriting(master.Rotate);
 
+        // 手工输入的母版串没有编码来源 -> 退回按 bbox 猜
         return fm.OrientLandscape();
     }
 
