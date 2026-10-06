@@ -9,6 +9,12 @@
     <AssemblyName>origami-ui</AssemblyName>
     <StartupObject>Origami.Desktop.Program</StartupObject>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!--
+      程序图标：嵌入为 Win32 资源，Windows 才能在任务栏 / 资源管理器 / Alt-Tab
+      显示它。仅设 AvaloniaResource 或 Window.Icon 是不够的 —— 那只管窗口内的标题栏。
+      icon.ico 含 16/24/32/48/64/128/256 共 7 个尺寸，覆盖任务栏到高 DPI 预览。
+    -->
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <InvariantGlobalization>false</InvariantGlobalization>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
   </PropertyGroup>
@@ -17,7 +23,13 @@
        警告自然消失，不需要压制。 -->
 
   <ItemGroup>
-    <AvaloniaResource Include="Assets/**" />
+    <!--
+      icon.png 是打包时从 icon.svg 渲染的 256px 位图 —— Avalonia 无内置 SVG
+      解码器，窗口标题图标需要位图，故用它而非矢量源文件。
+      icon.svg 与 icon-*.png 保留作设计源与文档用途，不嵌入。
+    -->
+    <AvaloniaResource Include="Assets\icon.png" />
+    <None Include="Assets\icon.svg" />
   </ItemGroup>
 
   <ItemGroup>

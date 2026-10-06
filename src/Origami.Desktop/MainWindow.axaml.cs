@@ -24,6 +24,7 @@ public partial class MainWindow : Window
         // 把 x:Name 声明的控件字段赋值上，手写一个同名方法会覆盖掉它
         InitializeComponent();
         DataContext = _vm;
+        AppIcon.Apply(this);
 
         Viewer.ViewChanged += (_, _) => UpdateZoomLabel();
 

@@ -118,6 +118,19 @@ public class UiSmokeTests
         dlg.Close();
     }
 
+    /// <summary>窗口与对话框都要有图标。</summary>
+    [AvaloniaFact]
+    public void 窗口带有图标()
+    {
+        var win = new MainWindow();
+        Assert.NotNull(win.Icon);
+        win.Close();
+
+        var dlg = new HelpDialog();
+        Assert.NotNull(dlg.Icon);
+        dlg.Close();
+    }
+
     [AvaloniaFact]
     public void 帮助对话框能加载()
     {
