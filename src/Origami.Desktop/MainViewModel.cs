@@ -87,49 +87,25 @@ public sealed class MainViewModel : Observable
 
     // ---------------------------------------------------------------- 文本输入框
 
-    bool _isTextMode;
-    /// <summary>
-    /// 「文本生成母版」开关的当前状态，<b>只控制那个文本输入框显不显示</b>。
-    /// <para>
-    /// 它<b>不</b>决定「渲染用哪一份输入」：母版框始终是唯一的渲染来源 ——
-    /// 文本模式生成的母版直接写进母版框（见 <see cref="GenerateFromTextAsync"/>），
-    /// 所以母版框始终可见、始终有效，用户可以随手接着改。</para>
-    /// </summary>
-    public bool IsTextMode
-    {
-        get => _isTextMode;
-        set
-        {
-            if (!Set(ref _isTextMode, value)) return;
-
-            if (!value)
-            {
-                // 关掉开关后别再自动生成 —— 母版框已经是唯一来源了
-                _generateTimer?.Stop();
-                return;
-            }
-
-            // 刚打开时直接聚焦，用户不用再点一下输入框；
-            // 框里已有内容则立刻生成一次，让画布与文本对得上
-            TextBoxRequested?.Invoke();
-            if (!string.IsNullOrWhiteSpace(TextInput)) ScheduleGenerate();
-        }
-    }
-
-    /// <summary>开关打开时请求把焦点交给文本框（由窗口注入）。</summary>
-    public Action? TextBoxRequested { get; set; }
-
     string _textInput = "";
-    /// <summary>文本输入框的内容（普通文本，如<code>KRENIO</code>，可分行）。</summary>
+    /// <summary>
+    /// 文本输入框的内容（普通文本，如 <code>KRENIO</code>，可分行）。
+    /// <para>
+    /// 改动后<b>自动生成母版</b>，用防抖合并连打。文本框常驻、无需开关 ——
+    /// 母版框就是它的产物，两者并存才说得通，藏起来反而像功能不存在。
+    /// </para>
+    /// </summary>
     public string TextInput
     {
         get => _textInput;
         set
         {
-            if (!Set(ref _textInput, value)) return;
-            if (IsTextMode) ScheduleGenerate();
+            if (Set(ref _textInput, value)) ScheduleGenerate();
         }
     }
+
+    /// <summary>文本水印提示。</summary>
+    public const string TextWatermark = "普通文本，可分行（字库支持 A-Z 0-9 与空格）";
 
     /// <summary>
     /// 文本改动后<b>自动生成母版</b>，用防抖合并连打。
@@ -151,7 +127,6 @@ public sealed class MainViewModel : Observable
             created.Tick += async (_, _) =>
             {
                 created.Stop();
-                if (!IsTextMode) return;
                 await GenerateFromTextAsync();
             };
             _generateTimer = created;
@@ -163,9 +138,6 @@ public sealed class MainViewModel : Observable
     }
 
     DispatcherTimer? _generateTimer;
-
-    /// <summary>文本输入框的水印提示。</summary>
-    public const string TextWatermark = "普通文本，可分行（字库支持 A-Z 0-9 与空格）";
 
     /// <summary>
     /// 由折纸字库把文本输入框的内容编成母版串，<b>写进母版框</b>并重渲。

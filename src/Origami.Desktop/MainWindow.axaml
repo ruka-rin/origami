@@ -69,74 +69,71 @@
 
   <DockPanel LastChildFill="True">
 
-    <!-- ═══════════ 顶栏 ═══════════
-         「文本」在「母版」上方：文本是可选的辅助入口，母版才是主体输入。
-         两行的标签列宽相同、输入框共享同一列定义，因此左右边界严格对齐、
-         宽度一致，且都随窗口拉伸占满可用空间。 -->
-    <Border DockPanel.Dock="Top" Background="{StaticResource Bgc.Chrome}">
-      <Grid Margin="18,12"
-            ColumnDefinitions="72,Auto,*"
-            RowDefinitions="Auto,Auto,Auto">
-        <!-- 标题行：右侧放主操作 -->
-        <TextBlock Grid.Row="0" Grid.ColumnSpan="3" Text="折纸谜题工具"
-                   FontSize="14" FontWeight="SemiBold"
-                   Foreground="{StaticResource Fg.Strong}" Margin="0,0,0,11" />
+    <!-- ═══════════ 左侧面板：输入与文件操作 ═══════════
+         垂直排布而非顶部横向：文本框要能分行（折蛇形），母版串很长，
+         两者都需要「宽」也「高」。放左侧后右边整块留给画布。 -->
+    <Border DockPanel.Dock="Left" Width="330"
+            Background="{StaticResource Bgc.Chrome}"
+            BorderBrush="{StaticResource Bdr.Hairline}" BorderThickness="0,0,1,0">
+      <Grid Margin="16,16">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-        <!-- 文本行。开关与文本框同行相邻：开关的意义就是「旁边那个框现在可用」。
-             标签用独立 TextBlock 与开关并排 —— ToggleSwitch 的 Content 会画在滑块旁边，
-             两者混成一块。On/Off 置空，说明放 ToolTip。 -->
-        <TextBlock Grid.Row="1" Grid.Column="0" Text="文本"
-                   VerticalAlignment="Center" FontSize="14"
-                   HorizontalAlignment="Center"
-                   Foreground="{StaticResource Fg.Muted}" />
+        <!-- 标题 -->
+        <TextBlock Grid.Row="0" Text="折纸谜题工具" FontSize="14" FontWeight="SemiBold"
+                   Foreground="{StaticResource Fg.Strong}" Margin="0,0,0,14" />
 
-        <ToggleSwitch Grid.Row="1" Grid.Column="1"
-                      IsChecked="{Binding IsTextMode, Mode=TwoWay}"
-                      IsEnabled="{Binding !Busy}"
-                      OnContent="" OffContent=""
-                      VerticalAlignment="Center" Margin="0,0,10,0"
-                      ToolTip.Tip="打开后右边出现文本输入框，输入普通文本（如 KRENIO）由折纸字库生成母版" />
+        <!--
+            输入区。文本框<b>常驻</b>，不再用开关切换 ——
+            母版框就是文本框的产物，两者并存才说得通；藏起来反而让人
+            以为功能不存在。
+            文本框在母版框<b>上方</b>：先输入文字，再得到母版，顺序即因果。
+        -->
+        <StackPanel Grid.Row="1" Spacing="8">
+          <TextBlock Classes="section" Text="文本 → 母版" Margin="0,0,0,0" />
+          <TextBox x:Name="TextBox"
+                   Text="{Binding TextInput}"
+                   Watermark="{Binding TextWatermark}"
+                   FontFamily="Consolas,Menlo,DejaVu Sans Mono,monospace"
+                   FontSize="12.5"
+                   MinHeight="104" MaxHeight="200"
+                   AcceptsReturn="True" TextWrapping="NoWrap"
+                   VerticalContentAlignment="Top"
+                   IsEnabled="{Binding !Busy}"
+                   ToolTip.Tip="可分行输入（分行会折成蛇形）。边打边生成母版，回车用于换行" />
 
-        <!-- 文本行。多行文本框：折蛇形需要分行输入，回车用来换行。
-             不设 KeyDown / LostFocus —— 母版改成「边打边出」（见ViewModel 的
-             ScheduleGenerate，220ms 防抖），用户无需任何提交动作。
-             高度随行数增长，4 行足够常见场景又不至于把母版框挤走。 -->
-        <TextBox Grid.Row="1" Grid.Column="2" x:Name="TextBox"
-                 Text="{Binding TextInput}"
-                 Watermark="{Binding TextWatermark}"
-                 FontFamily="Consolas,Menlo,DejaVu Sans Mono,monospace"
-                 FontSize="13"
-                 MinHeight="84" MaxHeight="180"
-                 AcceptsReturn="True" TextWrapping="NoWrap"
-                 VerticalContentAlignment="Top"
-                 IsVisible="{Binding IsTextMode}"
-                 IsEnabled="{Binding !Busy}"
-                 ToolTip.Tip="可分行输入（分行会折成蛇形）。边打边生成母版，回车用于换行" />
+          <TextBlock Classes="section" Text="母版" Margin="0,10,0,0" />
+          <TextBox x:Name="MasterBox"
+                   Text="{Binding MasterText}"
+                   Watermark="母版字符串，例如 /....|../.."
+                   FontFamily="Consolas,Menlo,DejaVu Sans Mono,monospace"
+                   FontSize="12.5"
+                   MinHeight="70" MaxHeight="140"
+                   AcceptsReturn="False"
+                   VerticalContentAlignment="Top"
+                   KeyDown="OnMasterKeyDown" LostFocus="OnMasterLostFocus"
+                   IsEnabled="{Binding !Busy}"
+                   ToolTip.Tip="可直接编辑母版串。回车或点别处即渲染" />
+        </StackPanel>
 
-        <!-- 母版行 -->
-        <TextBlock Grid.Row="2" Grid.Column="0" Text="母版"
-                   VerticalAlignment="Center" FontSize="14"
-                   HorizontalAlignment="Center"
-                   Foreground="{StaticResource Fg.Muted}" Margin="0,10,0,0" />
-
-        <TextBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2"
-                 x:Name="MasterBox"
-                 Text="{Binding MasterText}"
-                 Watermark="输入母版字符串，例如 /....|../.."
-                 FontFamily="Consolas,Menlo,DejaVu Sans Mono,monospace"
-                 FontSize="13"
-                 Margin="0,10,0,0"
-                 AcceptsReturn="False"
-                 KeyDown="OnMasterKeyDown" LostFocus="OnMasterLostFocus"
-                 IsEnabled="{Binding !Busy}" />
-
-        <!-- 导入不做二次确认：格式（母版文本 / 长条 SVG / 方形 SVG）由内容自动判别 -->
+        <!-- 文件操作。放左下角：与输入区同一条肌肉记忆（改内容 -> 存/取） -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,14,0,0">
+          <Button Content="导入…" MinWidth="88" HorizontalAlignment="Stretch"
+                  Click="OnImport" IsEnabled="{Binding !Busy}"
+                  ToolTip.Tip="导入母版文本，或长条 / 方形折痕图 SVG（彩色与黑白都支持）" />
+          <Button Content="保存…" MinWidth="88" HorizontalAlignment="Stretch"
+                  Click="OnSave" IsEnabled="{Binding !Busy}"
+                  ToolTip.Tip="导出当前视图：SVG 矢量或 PNG 位图" />
+        </StackPanel>
       </Grid>
     </Border>
 
     <!-- ═══════════ 底栏：状态 ═══════════ -->
     <Border DockPanel.Dock="Bottom" Background="{StaticResource Bgc.Chrome}">
-      <Grid Margin="18,8" ColumnDefinitions="Auto,*,Auto,Auto">
+      <Grid Margin="18,8" ColumnDefinitions="Auto,*,Auto">
         <TextBlock Grid.Column="0" Text="{Binding Status}" Foreground="{StaticResource Fg.Muted}"
                    VerticalAlignment="Center" Margin="0,0,20,0"
                    TextTrimming="CharacterEllipsis" MaxWidth="280" />
@@ -145,15 +142,6 @@
         <TextBlock Grid.Column="2" Text="{Binding ZoomText}" Foreground="{StaticResource Fg.Muted}"
                    VerticalAlignment="Center" MinWidth="60" Margin="20,0,0,0"
                    TextAlignment="Right" />
-
-        <!-- 导入 / 保存收进底栏：顶栏只留输入，减少视觉噪声 -->
-        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0">
-          <Button Content="导入…" MinWidth="76" Padding="12,4" FontSize="11.5"
-                  Click="OnImport" IsEnabled="{Binding !Busy}"
-                  ToolTip.Tip="导入母版文本，或长条 / 方形折痕图 SVG（彩色与黑白都支持）" />
-          <Button Content="保存…" MinWidth="76" Padding="12,4" FontSize="11.5"
-                  Click="OnSave" IsEnabled="{Binding !Busy}" />
-        </StackPanel>
       </Grid>
     </Border>
 

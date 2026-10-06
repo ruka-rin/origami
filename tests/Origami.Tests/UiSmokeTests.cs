@@ -105,6 +105,36 @@ public class UiSmokeTests
         win.Close();
     }
 
+    /// <summary>
+    /// 文本框与母版框都要<b>常驻可见</b>。
+    /// <para>
+    /// 文本框曾由一个开关控制显隐，如今取消 —— 母版框就是文本框的产物，
+    /// 两者并存才说得通，藏起一个反而像功能不存在。这里断言两个框
+    /// 都存在、都可见、且拿到实际布局尺寸（尺寸为 0 说明被折叠了）。
+    /// </para>
+    /// </summary>
+    [AvaloniaFact]
+    public void 文本框与母版框常驻可见()
+    {
+        var win = new MainWindow();
+        win.Show();
+        win.Measure(new Size(1320, 760));
+        win.Arrange(new Rect(0, 0, 1320, 760));
+        win.UpdateLayout();
+
+        foreach (var (name, box) in new[] { ("文本", win.TextInputBox), ("母版", win.MasterInputBox) })
+        {
+            Assert.True(box.IsVisible, $"{name}框不可见 —— 应常驻在左侧面板");
+            Assert.True(box.Bounds.Width > 0 && box.Bounds.Height > 0,
+                $"{name}框没有实际尺寸：{box.Bounds}");
+        }
+
+        // 文本框必须能分行，否则多行输入无从谈起
+        Assert.True(win.TextInputBox.AcceptsReturn, "文本框不接受回车，无法分行输入");
+
+        win.Close();
+    }
+
     [AvaloniaFact]
     public void 导出对话框能加载()
     {

@@ -18,6 +18,12 @@ public partial class MainWindow : Window
     /// </summary>
     public IReadOnlyList<RadioButton> ViewOptions => new[] { ShapeStrip, ShapeSquare, ContentCrease, ContentFolded, ContentPieces };
 
+    /// <summary>左侧面板的文本输入框（常驻，可分行）。</summary>
+    public TextBox TextInputBox => TextBox;
+
+    /// <summary>左侧面板的母版输入框。</summary>
+    public TextBox MasterInputBox => MasterBox;
+
     public MainWindow()
     {
         // 不要自己写 InitializeComponent() —— XAML 编译器生成的同名方法还负责
@@ -30,9 +36,6 @@ public partial class MainWindow : Window
 
         // 导入完成后要按目标视图的取景方式复位预览
         _vm.ViewerFit = tab => { if (tab is not null) Viewer.DefaultFit = EffectiveFit(tab); };
-
-        // 打开「文本」时输入框直接获得焦点，省掉一次点击
-        _vm.TextBoxRequested = () => TextBox.Focus();
 
         // 视图切换走 IsCheckedChanged 而非双向绑定写回：
         // RadioButton 先改自己的 IsChecked（GroupName 同时取消同组其它项），
@@ -88,10 +91,9 @@ public partial class MainWindow : Window
     {
         base.OnPointerPressed(e);
 
-        // 两个输入框：母版框常驻，文本框只在开关打开时存在，谁在显示就保护谁
-        var inputs = _vm.IsTextMode
-            ? new[] { MasterBox, TextBox }
-            : new[] { MasterBox };
+        // 两个输入框都常驻，母版框靠「失焦」触发渲染 ——
+        // Avalonia 的 TextBox 点击别处不会自动失焦，得手动 ClearFocus。
+        var inputs = new[] { MasterBox, TextBox };
 
         foreach (var input in inputs)
         {
