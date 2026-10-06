@@ -13,6 +13,13 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <!--
+      无头Avalonia：让 XAML 冒烟测试能在无显示环境里真正实例化窗口。
+      XAML 的错误（StaticResource 找不到、绑定写错）编译器查不出来，
+      只有把窗口 new 出来 + Show 才会暴露 —— 见 UiSmokeTests。
+    -->
+    <PackageReference Include="Avalonia.Headless" Version="11.2.3" />
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="11.2.3" />
   </ItemGroup>
 
   <ItemGroup>

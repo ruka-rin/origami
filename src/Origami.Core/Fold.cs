@@ -45,7 +45,7 @@ public sealed class FoldedModel
     {
         k %= 4;
         if (k == 0) return this;
-        // 必须走 7 参构造器：6 参那个会把 MvSeq 置空（见其内部实现），
+        // 必须走 7 参构造器：6 参那个会把 MvSeq 置空，
         // 而 OrientLandscape 默认就会走到这里。
         return new FoldedModel(World.Select(f => RotPoly(f, k)).ToList(), new List<int>(Rank),
                                new Dictionary<int, string>(MvMap),
@@ -76,7 +76,7 @@ public sealed class FoldedModel
         if ((x1 - x0) >= (y1 - y0)) return this;
         var cand = Rotate90(1);
         var (a0, b0, a1, b1) = cand.Bbox();
-        // 只有转完明显更接近横向才采用
+        // 转完未必更横向，只在确实变宽时采用
         return (a1 - a0) > (b1 - b0) ? cand : this;
     }
 
@@ -98,26 +98,21 @@ public sealed class FoldedModel
 public readonly record struct AdjEdge(int Neighbor, Segment Crease);
 
 /// <summary>
-/// 折叠与层序。
-/// <para>两种折叠路径：</para>
+/// 折叠与层序。两条物理路径：
 /// <list type="bullet">
-/// <item><b>长条（顺次滚动折叠）</b>：纸带折痕构成一条<b>链</b>。从起笔端出发，沿行进序把
-/// 「其后的整条尾巴」绕当前折痕的<b>当时世界坐标</b>反射 180°。朝向由起笔端唯一确定。</item>
-/// <item><b>方形（树反射）</b>：方形 CP 被剪切线切成若干独立纸片，每片内部折痕对偶图都是链。
-/// 从 root 出发 BFS，每个面沿<b>父边折痕</b>反射 —— 反射必须用折痕在<b>父亲当前姿态下</b>的世界坐标。</item>
+/// <item><b>长条（顺次滚动折叠）</b>：纸带折痕构成一条链。从起笔端出发，沿行进序把
+/// 「其后的整条尾巴」绕当前折痕反射 180°。层序 == 行进序（<c>rank[i] = i</c>）。</item>
+/// <item><b>方形（树反射）</b>：方形 CP 被剪切线切成若干独立纸片，邻接对偶图是一棵树。
+/// 从 root 出发 BFS，每个面沿<b>父边折痕</b>反射。层序由折叠深度与峰谷共同决定。</item>
 /// </list>
-/// <para><b>层序</b>：顺次折叠中层序 == 行进序（<c>rank[i] = i</c>）；树反射中层序由折叠深度
-/// 与峰谷共同决定。</para>
+/// <para>平面折纸里峰谷只决定层序，不影响剪影 —— 两种极性的成品互为翻面。</para>
 /// </summary>
 public static class FoldOps
 {
-    // ==================================================================
-    //  1. 顺次滚动折叠
-    // ==================================================================
+    // ---- 1. 顺次滚动折叠 ----
 
     /// <summary>
-    /// 顺次滚动折叠：每次把「其后的整条尾巴」绕当前折痕反射 180°。
-    /// 第 0 面恒为原位，所以返回坐标就是最终朝向，无需任何后处理。
+    /// 顺次滚动折叠。第 0 面恒为原位，所以返回坐标就是最终朝向，无需任何后处理。
     /// </summary>
     public static (List<List<Point>> World, List<Mat3> Transforms) RollFold(
         IReadOnlyList<List<Point>> faces, IReadOnlyList<Segment> creases)
@@ -141,9 +136,7 @@ public static class FoldOps
         return (output, ts);
     }
 
-    // ==================================================================
-    //  2. 折痕邻接
-    // ==================================================================
+    // ---- 2. 折痕邻接 ----
 
     /// <summary>边的规范键 <c>((x1,y1),(x2,y2))</c>。</summary>
     public static Segment EdgeKey(Point a, Point b) => Geom.SegKey(a, b);
@@ -182,16 +175,12 @@ public static class FoldOps
         return (adj, fk);
     }
 
-    // ==================================================================
-    //  3. 层序
-    // ==================================================================
+    // ---- 3. 层序 ----
 
     /// <summary>
-    /// 顺次滚动折叠的层序。
-    /// <para>★ 物理过程：从起笔端顺次折，每一步把「面 i+1 及其之后的整条尾巴」绕折痕 i
-    /// 翻到面 i 的上方。每一步折过来的东西都<b>盖在已折好的部分之上</b>，所以
-    /// <b>层序 == 行进序</b>，即 <c>rank[i] = i</c>。峰谷只决定「落在上面还是下面」，
-    /// 不改变次序（两种极性的成品互为翻面，剪影相同）。</para>
+    /// 顺次滚动折叠的层序：<c>rank[i] = i</c>。
+    /// <para>每一步折过来的东西都盖在已折好的部分之上，故层序 == 行进序。峰谷只决定
+    /// 「落在上面还是下面」，不改变次序。</para>
     /// </summary>
     public static List<int> LayerRanks(int faceCount, IReadOnlyList<Segment> creases,
                                         IReadOnlyList<string>? mv = null)
@@ -223,16 +212,13 @@ public static class FoldOps
         return bad;
     }
 
-    // ==================================================================
-    //  4. 方形：树反射
-    // ==================================================================
+    // ---- 4. 方形：树反射 ----
 
     /// <summary>
     /// 方形 CP -&gt; 折叠成品（<b>树反射</b>，与长条顺次折不同的物理过程）。
-    /// <para>方形 CP 是完整 N×N 方块，其面片邻接对偶图是一棵<b>树</b>。从 <c>root</c> 出发
-    /// BFS，每个面沿父边折痕反射 180°，且必须用折痕在<b>父亲当前姿态下的世界坐标</b>：
+    /// <para>反射必须用折痕在<b>父亲当前姿态下的世界坐标</b>：
     /// <c>T_child = Refl(T_parent(a), T_parent(b)) @ T_parent</c>。用纸面坐标会发散。</para>
-    /// <para>峰谷沿树严格交替（父为峰则子为谷）—— 平面折纸里峰谷只决定层序，不影响剪影。</para>
+    /// <para>峰谷沿树严格交替（父为峰则子为谷）。</para>
     /// </summary>
     public static (List<List<Point>> World, Dictionary<int, string> Mv,
                    Dictionary<int, int> Depth, List<int> Order,
@@ -289,7 +275,6 @@ public static class FoldOps
         }
         int root = rootIdx.Value;
 
-        // BFS 定序 + 峰谷交替
         var mv = new Dictionary<int, string> { [root] = Mv.Mountain };
         var depth = new Dictionary<int, int> { [root] = 0 };
         var par = new Dictionary<int, int?> { [root] = null };
@@ -314,7 +299,7 @@ public static class FoldOps
         if (order.Count != faces.Count)
             throw new InvalidOperationException($"方形 CP 面片不连通 {order.Count}/{faces.Count}");
 
-        // 逐级反射
+        // 逐级反射：T[v] = Refl(父姿态下的折痕) * T[父]
         var T = new Dictionary<int, Mat3> { [root] = Mat3.Identity };
         foreach (int v in order)
         {
@@ -336,13 +321,12 @@ public static class FoldOps
     }
 
     /// <summary>
-    /// 方形折叠的层序（谁盖住谁）。
-    /// <para>★ 物理过程：折好一个纸堆后，某面被压住的位置取决于它相对基准面的
-    /// <b>折叠深度</b>与<b>峰谷方向</b>：深度每增 1 层 z 量级翻倍（保证深处的面一定在外侧）；
-    /// 同一深度带内峰（M）朝上、谷（V）朝下。用 <c>z = ±2^(depth/2)·(1+(depth%2)·1e-3)</c>。</para>
-    /// <para>★ 并列（同一深度带内 z 相等）时按<b>面片质心的字典序</b>打破，而不是按面下标 ——
-    /// 这样层序只依赖几何，不依赖 <c>halfedge_faces</c> 的枚举顺序，结果可复现。
-    /// 返回 <c>rank[i]</c>（小 = 靠下）。</para>
+    /// 方形折叠的层序（谁盖住谁），返回 <c>rank[i]</c>（小 = 靠下）。
+    /// <para>某面被压住的位置取决于它相对基准面的<b>折叠深度</b>与<b>峰谷方向</b>：
+    /// 深度每增 1 层 z 量级翻倍（保证深处的面一定在外侧）；同一深度带内峰（M）朝上、
+    /// 谷（V）朝下。用 <c>z = ±2^(depth/2)·(1+(depth%2)·1e-3)</c>。</para>
+    /// <para>并列（z 相等）时按<b>面片质心的字典序</b>打破，而不是按面下标 ——
+    /// 这样层序只依赖几何，不依赖 <c>halfedge_faces</c> 的枚举顺序，结果可复现。</para>
     /// </summary>
     public static List<int> SquareLayerOrder(int n, Dictionary<int, string> mv,
                                               Dictionary<int, int> depth,
@@ -357,7 +341,6 @@ public static class FoldOps
             z[i] = s * Math.Pow(2.0, d / 2) * (1.0 + (d % 2) * 1e-3);
         }
 
-        // 并列时用质心字典序（几何量）而不是面下标（枚举序）打破
         var centroids = new Point[n];
         for (int i = 0; i < n; i++)
             centroids[i] = faces is not null && i < faces.Count
@@ -393,8 +376,8 @@ public static class FoldOps
         var (world, _) = RollFold(faces, creases);
         var rank = LayerRanks(faces.Count, creases, mv);
 
-        // ★ 同时给出 MvMap 与 MvSeq：渲染层优先读 MvMap（按面下标取），
-        //   只给 MvSeq 的话 MvMap 是空的，着色会被静默跳过（成品一片空白）。
+        // 必须同时给出 MvMap 与 MvSeq：渲染层优先读 MvMap（按面下标取），
+        // 只给 MvSeq 的话 MvMap 是空的，着色会被静默跳过（成品一片空白）。
         var mvMap = new Dictionary<int, string>();
         for (int i = 0; i < creases.Count && i < mv.Count; i++)
             mvMap[CreaseOwner(creases[i], faces)] = mv[i];

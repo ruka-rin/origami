@@ -115,7 +115,7 @@ public static class SquareOps
             else p.Diag[(Math.Min(ax, bx), Math.Min(ay, by))] = by < ay ? '/' : '\\';
         }
 
-        // ★ 转折列上的竖折痕可能同时是母版的 pipe。正向规则是「k 在 pipes 里就画竖折痕」，
+        // 转折列上的竖折痕可能同时是母版的 pipe。正向规则是「k 在 pipes 里就画竖折痕」，
         // 而转折列本来就要画竖折痕，两者重合时 P 会被 B/T 覆盖 —— 逆向就会丢掉这个 pipe。
         // 这里补记：只要 k 落在有效范围内就认为它是 pipe。
         foreach (var entry in p.Vert.ToList())

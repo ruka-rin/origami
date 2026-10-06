@@ -6,10 +6,9 @@ namespace Origami.Core;
 /// <summary>
 /// 把 <see cref="CanvasTransform"/> 施加到一段已生成的 SVG 文本上。
 /// <para>
-/// ★ <b>预览与导出走同一条路径</b>：预览渲染的 SVG 与导出的 SVG 是<b>同一段文本</b>
-/// （都是 <see cref="Views"/> 侧传同一个 <see cref="CanvasTransform"/> 生成的结果），
-/// 所以「屏幕上看到的方向」与「存到文件里的方向」不可能不一致 ——
-/// 这正是把方向做成显示层变换、而不是去改折叠算法约定的原因。</para>
+/// <b>预览与导出走同一条路径</b>：预览渲染的 SVG 与导出的 SVG 是<b>同一段文本</b>，
+/// 所以「屏幕上看到的方向」与「存到文件里的方向」不可能不一致 —— 这正是把方向做成
+/// 显示层变换、而不是去改折叠算法约定的原因。</para>
 /// </summary>
 public static class SvgTransform
 {
@@ -18,13 +17,11 @@ public static class SvgTransform
     /// 并按变换后的尺寸改写 <c>viewBox</c> / <c>width</c> / <c>height</c>。
     /// </summary>
     /// <remarks>
-    /// ★ <b>不用改写任何图元坐标</b>：整点旋转与镜像在 SVG 里就是一个仿射矩阵，
-    ///   包一层 <c>&lt;g&gt;</c> 即可，保持了折痕图「坐标即数据」的直白性
-    ///   （<see cref="SvgIO.SvgToModel"/> 仍能原样读回 —— 变换只影响呈现，不影响数据）。
-    ///   <br/>
-    /// ★ <b>viewBox 必须同步改</b>：转 90° 后画布宽高互换，若沿用原 viewBox，
-    ///   内容会被裁掉一半。纸底 <c>&lt;rect&gt;</c> 同样要一起变换，
-    ///   否则会露出一块没被旋转的底色。
+    /// <b>不改写任何图元坐标</b>：整点旋转与镜像在 SVG 里就是一个仿射矩阵，包一层
+    /// <c>&lt;g&gt;</c> 即可，保持了折痕图「坐标即数据」的直白性
+    /// （<see cref="SvgIO.SvgToModel"/> 仍能原样读回 —— 变换只影响呈现，不影响数据）。
+    /// <b>viewBox 必须同步改</b>：转 90° 后画布宽高互换，若沿用原 viewBox，
+    /// 内容会被裁掉一半。纸底 <c>&lt;rect&gt;</c> 同样要一起变换，否则会露出一块没被旋转的底色。
     /// </remarks>
     public static string Apply(string svg, CanvasTransform t)
     {
@@ -44,7 +41,6 @@ public static class SvgTransform
         var (w, h) = ReadSize(root);
         var (nw, nh) = t.SizeOf(w, h);
 
-        // mA..mF 是 matrix(a b c d e f) 的六个分量
         var (mA, mB, mC, mD, mE, mF) = t.Matrix(w, h);
 
         // 把所有子元素（含纸底 rect）移进一个新的 <g>

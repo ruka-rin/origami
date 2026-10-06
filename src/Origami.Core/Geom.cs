@@ -8,7 +8,7 @@ namespace Origami.Core;
 /// （左上→右下）。因此单个 <c>/</c> 格顺次折叠后得到 <c>{(0,0),(0,1),(1,1)}</c>，
 /// 在 y 向上的坐标系里正是左上三角 ◤。
 /// </para>
-/// <para>★ 渲染到图片/屏幕时必须翻转 y：<c>screen_y = ymax - y</c>。</para>
+/// <para>渲染到图片/屏幕时必须翻转 y：<c>screen_y = ymax - y</c>。</para>
 /// </summary>
 public static class Geom
 {
@@ -184,12 +184,12 @@ public static class Geom
 
     /// <summary>
     /// 平面直线图 -&gt; 所有<b>有限</b>面片（半边遍历）。
-    /// <para>★ 过滤外部无限面必须用<b>有符号面积</b>：正 = 有限内部面，负 = 那个绕整张纸
+    /// <para>过滤外部无限面必须用<b>有符号面积</b>：正 = 有限内部面，负 = 那个绕整张纸
     /// 外圈的巨大面。用绝对值会把它留下来。</para>
-    /// <para>★★ <paramref name="simplify"/> 默认 <c>false</c>，即<b>保留共线顶点</b>。
+    /// <para><paramref name="simplify"/> 默认 <c>false</c>，即<b>保留共线顶点</b>。
     /// 这不是美观问题而是正确性问题：折痕端点若落在某条边中间，删掉共线顶点会让该折痕
     /// 在面片边界上「消失」，对偶图随之丢边甚至断开。</para>
-    /// <para>★ 遍历起点按<b>字典序最小</b>的线段确定，使面片顺序只依赖输入几何，
+    /// <para>遍历起点按<b>字典序最小</b>的线段确定，使面片顺序只依赖输入几何，
     /// 不依赖任何哈希表的内部顺序 —— 输出因此可复现。</para>
     /// </summary>
     public static List<List<Point>> HalfedgeFaces(
@@ -203,7 +203,6 @@ public static class Geom
         foreach (var s in border) all.Add(s);
         var edges = SegOrder.Sorted(all);
 
-        // 顶点 -> 邻点集合
         var adj = new Dictionary<Point, HashSet<Point>>();
         foreach (var (a, b) in edges)
         {
@@ -263,9 +262,8 @@ public static class Geom
     }
 
     /// <summary>
-    /// 把多边形顶点旋转到<b>字典序最小的顶点开头</b>。
-    /// <para>半边遍历的起点决定了顶点列表的旋转方向，而旋转不影响多边形本身 ——
-    /// 但把它规范化能让输出只依赖几何，不依赖遍历顺序。</para>
+    /// 把多边形顶点旋转到<b>字典序最小的顶点开头</b>。旋转不影响多边形本身，
+    /// 但规范化能让输出只依赖几何，不依赖遍历顺序。
     /// </summary>
     public static List<Point> Canonicalize(List<Point> poly)
     {
@@ -328,7 +326,7 @@ public static class Geom
     /// 平面坐标 -&gt; 屏幕像素坐标（屏幕 y 向下）。
     /// <para><c>flipY=true</c>：输入是<b>数学坐标（y 向上）</c>，渲染时翻转；
     /// <c>flipY=false</c>：输入已是<b>屏幕坐标（y 向下）</c>，直接映射。</para>
-    /// <para>★ 只有一种组合能得到正立的成品：<b>长条</b>用数学坐标 -&gt; <c>true</c>；
+    /// <para>只有一种组合能得到正立的成品：<b>长条</b>用数学坐标 -&gt; <c>true</c>；
     /// <b>方形</b>的 CP 与折叠结果都用屏幕坐标 -&gt; <c>false</c>。</para>
     /// </summary>
     public static (List<List<Point>> Screen, (double X0, double Y0, double X1, double Y1) Bbox,

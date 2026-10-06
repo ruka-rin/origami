@@ -6,8 +6,7 @@ namespace Origami.Core;
 /// 折好后就拼出该字符。生成的结果与手写的母版是同一种东西，所以可以
 /// 直接喂给 <see cref="Master"/> / <see cref="Layout"/>，铺方、折叠、
 /// 逆向全都照常работа。</para>
-/// <para>
-/// <b>编码符号</b>（见 <see cref="ParseEnc"/>）：
+/// <para><b>编码符号</b>（见 <see cref="ParseEnc"/>）：
 /// <list type="bullet">
 /// <item><c>_</c> / 空格 —— 前进两格（不折）</item>
 /// <item><c>!</c> —— 前进一格</item>
@@ -16,15 +15,14 @@ namespace Origami.Core;
 /// <item><c>#</c> —— 翻转后续斜折的方向</item>
 /// <item><c>~</c> —— 字模自身的起止标记（成对，取第一对之间）</item>
 /// <item><c>@</c> —— 旋转标记，紧跟 <c>~</c> 之后</item>
-/// </list>
-/// </para>
+/// </list></para>
 /// </summary>
 public static class FoldFont
 {
     /// <summary>字模表：字符 -&gt; 编码串。
-    /// <para>★ 这是<b>数据</b>不是逻辑，逐字照搬旧实现 —— 改任何一个字符都会让
-    /// 折出来的字母变形。<c>Xstart</c> 是「词首」变体，用于每行第一个字符
-    /// （它能折进纸条的起始端，不需要额外的对齐余量）。</para>
+    /// <para>这是<b>数据</b>不是逻辑，改任何一个字符都会让折出来的字母变形。
+    /// <c>Xstart</c> 是「词首」变体，用于每行第一个字符（它能折进纸条的起始端，
+    /// 不需要额外的对齐余量）。</para>
     /// </summary>
     public static readonly Dictionary<string, string> Encodings = new()
     {
@@ -81,11 +79,9 @@ public static class FoldFont
 
     /// <summary>
     /// 解析一段编码，返回折痕序列。
-    /// <para>
-    /// ★ 关键在 <c>flipped</c> 状态：<c>/</c> 与 <c>\</c> 的实际方向随它翻转。
+    /// <para>关键在 <c>flipped</c> 状态：<c>/</c> 与 <c>\</c> 的实际方向随它翻转。
     /// 折纸里同一个「向左斜」在纸翻面后会变成「向右斜」，字模正是用 <c>#</c>
-    /// 标记这条边界 —— 少了这个状态，所有带翻面的字母都会折错方向。
-    /// </para>
+    /// 标记这条边界 —— 少了这个状态，所有带翻面的字母都会折错方向。</para>
     /// </summary>
     public static EncodedLetter ParseEnc(string s, bool continuous = false)
     {
@@ -204,14 +200,13 @@ public static class FoldFont
         return new string(chars);
     }
 
-    /// <summary>折痕序列 -&gt; 母版串（<see cref="Layout.MasterToCreases"/> 的逆运算）。
+    /// <summary>折痕序列 -&gt; 母版串（<see cref="Layout.MasterToCreases"/> 的逆运算）。</summary>
     /// <remarks>
-    /// ★ 竖折痕是<b>插进去</b>而不是替换格子：母版串里 <c>|</c> 不占格位，
+    /// 竖折痕是<b>插进去</b>而不是替换格子：母版串里 <c>|</c> 不占格位，
     /// <c>p=k</c> 表示「第 k 格<b>之前</b>有一条竖折痕」，而第 k-1 格的斜折痕
     /// 落在 x=2(k-1) 上、竖折痕落在 x=2k 上，两者并不冲突。
     /// 同理 x=0 的竖折痕要丢掉 —— 母版格式里 <c>pipes</c> 取值只能是 1..格数。
     /// </remarks>
-    /// </summary>
     public static string CreasesToMaster(IReadOnlyList<(int Xb, int Xt)> creases)
     {
         if (creases.Count < 2) return "";

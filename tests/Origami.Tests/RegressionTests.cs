@@ -10,6 +10,30 @@ namespace Origami.Tests;
 /// </summary>
 public class RegressionTests
 {
+    // ---------------------------------------------------------------- 铺排基准
+
+    /// <summary>
+    /// 两个内置样例母版的铺排基准值。
+    /// <para>这些数字原来只存在于 <see cref="SampleMasters"/> 的文档注释里 ——
+    /// 注释不会随代码一起被测试验证，改坏了也没人知道。这里把它们变成断言：
+    /// 「母版 → 方形 CP」是全项目的地基，它漂了整个工具的输出都会错，
+    /// 而漂移往往只表现为「成品字母形状怪」，很难一眼归因。</para>
+    /// </summary>
+    [Theory]
+    [InlineData(SampleMasters.Krenio, 100, 9, 11, 80)]
+    [InlineData(SampleMasters.Protein, 118, 11, 12, 91)]
+    public void 铺排基准值不变(string text, int nCell, int nPipes, int n, int folds)
+    {
+        var m = Master.ParseMaster(text);
+
+        Assert.Equal(nCell, m.NCell);
+        Assert.Equal(nPipes, m.Pipes.Count);
+
+        var plan = SquareOps.PlanFromMaster(m);
+        Assert.Equal(n, plan.N);
+        Assert.Equal(folds, plan.Fold.Count);
+    }
+
     // ---------------------------------------------------------------- 铺排
 
     /// <summary>

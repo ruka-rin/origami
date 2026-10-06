@@ -3,8 +3,97 @@
              x:Class="Origami.Desktop.App"
              RequestedThemeVariant="Dark">
 
+  <Application.Resources>
+    <!--
+      设计令牌。原先色值散落在各处的十六进制字面量里，改配色要翻遍所有 XAML，
+      且同一个「分隔线」在不同文件里是三个不同的灰。这里收敛成单一来源。
+    -->
+
+    <!-- 层次：底色 ->面板 -> 悬浮，越靠上层越亮 -->
+    <SolidColorBrush x:Key="Bgc.Base" Color="#16161A" />
+    <SolidColorBrush x:Key="Bgc.Panel" Color="#1C1C22" />
+    <SolidColorBrush x:Key="Bgc.Chrome" Color="#1E1E24" />
+    <SolidColorBrush x:Key="Bgc.Sunken" Color="#1A1A1F" />
+    <SolidColorBrush x:Key="Bgc.Hover" Color="#26262E" />
+    <SolidColorBrush x:Key="Bgc.Active" Color="#2C3346" />
+    <SolidColorBrush x:Key="Bgc.Scrim" Color="#C016161A" />
+
+    <!-- 描边：分隔线与卡片边框 -->
+    <SolidColorBrush x:Key="Bdr.Hairline" Color="#2A2A33" />
+    <SolidColorBrush x:Key="Bdr.Subtle" Color="#32323C" />
+
+    <!-- 文字：四级，对应标题 / 正文 / 次要 / 占位 -->
+    <SolidColorBrush x:Key="Fg.Strong" Color="#E6E9EE" />
+    <SolidColorBrush x:Key="Fg.Base" Color="#B9C0CC" />
+    <SolidColorBrush x:Key="Fg.Muted" Color="#7C8391" />
+    <SolidColorBrush x:Key="Fg.Faint" Color="#565C68" />
+
+    <!-- 强调色：选中态与焦点 -->
+    <SolidColorBrush x:Key="Accent" Color="#5B9DFF" />
+    <SolidColorBrush x:Key="Accent.Soft" Color="#2F3D5C" />
+
+    <!-- 间距：4 的倍数，保证节奏一致 -->
+    <x:Double x:Key="Gap.Tight">6</x:Double>
+    <x:Double x:Key="Gap.Small">10</x:Double>
+    <x:Double x:Key="Gap.Medium">16</x:Double>
+    <x:Double x:Key="Gap.Large">24</x:Double>
+
+    <!-- 圆角 -->
+    <CornerRadius x:Key="Rounded.Control">6</CornerRadius>
+    <CornerRadius x:Key="Rounded.Panel">8</CornerRadius>
+  </Application.Resources>
+
   <Application.Styles>
     <FluentTheme />
+
+    <!-- 按钮文字一律居中：Fluent 默认 Stretch，按钮被Grid 拉宽后文字会贴左 -->
+    <Style Selector="Button">
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="CornerRadius" Value="{StaticResource Rounded.Control}" />
+      <Setter Property="Padding" Value="14,6" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <Style Selector="ToggleSwitch">
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+    </Style>
+
+    <!-- 输入类控件统一底色与圆角，避免各处手写 -->
+    <Style Selector="TextBox">
+      <Setter Property="CornerRadius" Value="{StaticResource Rounded.Control}" />
+      <Setter Property="Background" Value="{StaticResource Bgc.Sunken}" />
+      <Setter Property="BorderBrush" Value="{StaticResource Bdr.Subtle}" />
+      <Setter Property="Padding" Value="8,6" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <Style Selector="ComboBox">
+      <Setter Property="CornerRadius" Value="{StaticResource Rounded.Control}" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <!-- 小节标题：全大写 + 宽字距，读起来是标签而不是内容 -->
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontSize" Value="10.5" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource Fg.Muted}" />
+      <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+
+    <!-- 提示性说明文字 -->
+    <Style Selector="TextBlock.hint">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{StaticResource Fg.Muted}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="LineHeight" Value="17" />
+    </Style>
+
+    <!-- 分隔线 -->
+    <Style Selector="Rectangle.hairline">
+      <Setter Property="Height" Value="1" />
+      <Setter Property="Fill" Value="{StaticResource Bdr.Hairline}" />
+    </Style>
   </Application.Styles>
 
 </Application>

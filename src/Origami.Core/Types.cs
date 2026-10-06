@@ -46,7 +46,7 @@ public readonly record struct Segment(Point A, Point B)
     public override string ToString() => $"({A} -> {B})";
 }
 
-/// <summary>RGB 颜色。★ 与 <see cref="SvgIO"/> 的配色常量严格对应。</summary>
+/// <summary>RGB 颜色。与 <see cref="SvgIO"/> 的配色常量严格对应。</summary>
 public readonly record struct Rgb(byte R, byte G, byte B)
 {
     public static readonly Rgb Black = new(0, 0, 0);

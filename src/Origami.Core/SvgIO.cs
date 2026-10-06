@@ -5,26 +5,22 @@ using System.Xml.Linq;
 namespace Origami.Core;
 
 /// <summary>
-/// 折痕图 SVG &lt;-&gt; 数据模型双向转换（<b>序列化</b>，不是渲染）。
+/// 折痕图 SVG &lt;-&gt; 数据模型双向转换（<b>序列化</b>，不是渲染；光栅化在 <see cref="PngIO"/>）。
 /// <para>折痕图是<b>单文件自描述</b>的数据载体：<c>data-*</c> 属性携带全部语义，
-/// 无需 sidecar 即可还原数据模型。<c>ModelToSvg</c> 把模型写成 SVG 文本，
-/// <c>SvgToModel</c> 读回来；两者必须严格互逆。</para>
-/// <para>本模块<b>不做光栅化</b> —— SVG -&gt; PNG 的渲染在 <see cref="PngIO"/>。
-/// 这里直接手写序列化而不用 SVG 库，是为了完全控制属性顺序与数字格式，
-/// 从而保证 <c>svg -&gt; json -&gt; svg</c> 往返在几何与配色上逐条一致；
-/// 折痕图是数据而非渲染产物，交给渲染引擎反而会丢掉这些语义。</para>
+/// <c>ModelToSvg</c> 与 <c>SvgToModel</c> 严格互逆。这里手写序列化而不用 SVG 库，
+/// 是为了完全控制属性顺序与数字格式，保证 <c>svg -&gt; json -&gt; svg</c> 往返
+/// 在几何与配色上逐条一致。</para>
 /// <para><b>坐标系</b>：<c>strip</c> 是数学坐标（y 向上），写成 SVG 时
 /// <c>svg_y = (ncell - paper_y) * unit</c>；<c>square</c> 是屏幕坐标（y 向下），
 /// <c>svg_y = paper_y * unit</c>。</para>
-/// <para>★ 线宽层级：<b>红蓝折痕比绿剪切线与黑边框更细</b> —— 折痕是主体信息，应最精细；
-/// 剪切线与边框是辅助参照，画粗反而喧宾夺主。折痕图<b>不画任何标题文字</b>。</para>
-/// <para>往返保证：<c>svg -&gt; json -&gt; svg</c> 必须在几何与配色上完全一致。</para>
+/// <para><b>线宽层级</b>：红蓝折痕比绿剪切线与黑边框更细 —— 折痕是主体信息，
+/// 辅助参照画粗反而喧宾夺主。折痕图<b>不画任何标题文字</b>。</para>
 /// </summary>
 public static class SvgIO
 {
     public const string SvgNs = "http://www.w3.org/2000/svg";
 
-    /// <summary>配色（与原题 CP.png 一致）。★ 与 <see cref="PngIO"/> 的 RGB 常量严格对应。</summary>
+    /// <summary>配色。与 <see cref="PngIO"/> 的 RGB 常量严格对应。</summary>
     public static readonly Dictionary<string, string> ColorMv = new()
     {
         ["M"] = "#f00",      // 红 = 峰
@@ -57,9 +53,7 @@ public static class SvgIO
 
     static string Num(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
 
-    // ==================================================================
-    //  模型 -> SVG
-    // ==================================================================
+    // ---- 模型 -> SVG ----
 
     /// <summary>数据模型 -&gt; 折痕图 SVG <b>文本</b>。坐标系按 <c>kind</c> 自动选择。</summary>
     /// <remarks>不碰文件系统 —— 写盘由调用方（CLI）负责。</remarks>
@@ -93,7 +87,7 @@ public static class SvgIO
 
         double W = wCells * unit + 2 * padV, H = hCells * unit + 2 * padV;
 
-        // ★ 线段坐标直接写全局系（不加 <g transform>）—— 解析端不需反推平移量，往返必然精确
+        // 线段坐标直接写全局系（不加 <g transform>）—— 解析端不需反推平移量，往返必然精确
         var sb = new StringBuilder();
         sb.Append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         sb.Append($"<svg xmlns=\"{SvgNs}\" version=\"1.1\" viewBox=\"0 0 {Fmt(W)} {Fmt(H)}\" ")
@@ -103,7 +97,7 @@ public static class SvgIO
         sb.Append($"  <rect x=\"0\" y=\"0\" width=\"{Fmt(W)}\" height=\"{Fmt(H)}\" fill=\"#ffffff\"/>\n");
         sb.Append("  <g fill=\"none\" stroke-linecap=\"round\">\n");
 
-        // ★ 先画粗的（边框、剪切线），再画细的（折痕）—— 细线不会被压住
+        // 先画粗的（边框、剪切线），再画细的（折痕）—— 细线不会被压住
         var order = new Dictionary<string, int> { ["border"] = 0, ["cut"] = 1, ["fold"] = 2 };
         var width = new Dictionary<string, double>
         {
@@ -113,7 +107,7 @@ public static class SvgIO
 
         foreach (var (role, seg, mv) in segs)
         {
-            // ★ 上色关闭时一律纯黑：这就是「题面线稿」
+            // 上色关闭时一律纯黑：这就是「题面线稿」
             string col, extra;
             if (!color) { col = InkOnly; extra = $" data-mv=\"{mv}\""; }
             else if (role == "fold")
@@ -134,9 +128,7 @@ public static class SvgIO
         return sb.ToString();
     }
 
-    // ==================================================================
-    //  SVG -> 模型
-    // ==================================================================
+    // ---- SVG -> 模型 ----
 
     /// <summary>折痕图 SVG <b>文本</b> -&gt; 数据模型。
     /// <paramref name="strict"/> 要求每条 &lt;line&gt; 都带 class，否则按颜色猜测。</summary>
@@ -245,9 +237,7 @@ public static class SvgIO
         _ => "fold",
     };
 
-    // ==================================================================
-    //  JSON 读写
-    // ==================================================================
+    // ---- JSON 读写 ----
 
     /// <summary>数据模型 -&gt; JSON 文件。</summary>
     /// <remarks>
@@ -255,14 +245,14 @@ public static class SvgIO
     /// <list type="bullet">
     /// <item>缩进 2 空格，每个标量各占一行，末尾无换行；</item>
     /// <item>线段写成 <c>[[x1,y1],[x2,y2]]</c>，坐标取整以避免浮点噪声；</item>
-    /// <item>键顺序固定：<c>kind</c> → 尺寸 → <c>cut</c> → <c>folds</c> → <c>border</c>
-    /// → <c>version</c> → <c>generator</c>，保证同一模型多次写出完全一致。</item>
+    /// <item>键顺序固定（<c>kind</c> → 尺寸 → <c>cut</c> → <c>folds</c> → <c>border</c>
+    /// → <c>version</c> → <c>generator</c>），保证同一模型多次写出完全一致。</item>
     /// </list>
     /// </remarks>
     public static string ModelToJson(Model model, int indent = 2)
     {
-        // 键顺序即上面的格式约定：strip 与 square 的前几个键不同，
-        // 其余一致；_pipes 只在 strip 下出现。
+        // 键顺序即格式约定：strip 与 square 的前几个键不同，其余一致；
+        // _pipes 只在 strip 下出现。
         var fields = new List<(string Key, PyVal Val)>();
 
         if (model.Kind == "strip")
@@ -351,7 +341,7 @@ public static class SvgIO
         }
     }
 
-    /// <summary>单条线段 -&gt; <c>[x1,y1,x2,y2]</c>？不 —— 线段是 <c>[[x1,y1],[x2,y2]]</c>。</summary>
+    /// <summary>单条线段 -&gt; <c>[[x1,y1],[x2,y2]]</c>（不是扁平的四元组）。</summary>
     static PyVal SegVal(Segment s) => PyVal.Arr(new List<PyVal>
     {
         PyVal.Arr(new List<PyVal> { PyVal.Num(Geom.RoundInt(s.A.X)), PyVal.Num(Geom.RoundInt(s.A.Y)) }),
@@ -437,9 +427,7 @@ public static class SvgIO
         return o;
     }
 
-    // ==================================================================
-    //  校验 / 摘要
-    // ==================================================================
+    // ---- 校验 / 摘要 ----
 
     /// <summary>基本自洽性检查：线段无重复、坐标为整数格点、折痕都有合法峰谷。</summary>
     public static void ValidateModel(Model model, string src = "")
@@ -483,17 +471,12 @@ public static class SvgIO
                $"剪切{model.Cut.Count} 外框{model.Border.Count}";
     }
 
-    // ==================================================================
-    //  成品 / 原子片 —— 视图层与 CLI 共用
-    // ==================================================================
+    // ---- 成品 / 原子片 —— 视图层与 CLI 共用 ----
 
     /// <summary>
-    /// 折叠成品 -&gt; SVG 文本。
-    /// <para>
-    /// 面片按<b>层序</b>从下往上叠画，这样画出来的图天然带遮挡关系。
-    /// <paramref name="color"/> 关闭时是<b>纯黑剪影</b>（去掉颜色只看形状）。</para>
-    /// <para>
-    /// ★ <paramref name="flipY"/> 决定输入坐标朝向：长条顺次折叠是数学坐标
+    /// 折叠成品 -&gt; SVG 文本。面片按<b>层序</b>从下往上叠画，天然带遮挡关系。
+    /// <paramref name="color"/> 关闭时是<b>纯黑剪影</b>（去掉颜色只看形状）。
+    /// <para><paramref name="flipY"/> 决定输入坐标朝向：长条顺次折叠是数学坐标
     ///（y 向上）需 <c>true</c>；方形树反射已是屏幕坐标（y 向下）需 <c>false</c>。
     /// 混用会让成品上下颠倒。</para>
     /// </summary>
@@ -546,10 +529,9 @@ public static class SvgIO
 
     /// <summary>
     /// 原子片分解图 -&gt; SVG 文本：<b>每个面片一种颜色</b>。
-    /// <para>
-    /// 用途是查漏面 / 查重叠：正确的折叠里每片颜色都应唯一可辨；
-    /// 若出现两片同色相邻、或某片颜色「消失」，说明面片划分或层序有问题。
-    /// 颜色按面下标用黄金角散列生成 —— 不用 <c>Random</c>，保证跨平台一致。</para>
+    /// <para>用途是查漏面 / 查重叠：正确的折叠里每片颜色都应唯一可辨；若出现两片同色相邻、
+    /// 或某片颜色「消失」，说明面片划分或层序有问题。颜色按面下标用黄金角散列生成 ——
+    /// 不用 <c>Random</c>，保证跨平台一致。</para>
     /// </summary>
     public static string PiecesToSvg(IReadOnlyList<List<Point>> world,
                                      double unit = 18.0, double pad = 14.0,

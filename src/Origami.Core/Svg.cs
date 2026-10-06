@@ -5,17 +5,13 @@ namespace Origami.Core;
 /// <para>
 /// 折痕图是<b>单文件自描述</b>的：<c>data-*</c> 属性携带全部语义，无需 sidecar
 /// 即可还原数据模型，所以 <c>svg -&gt; model -&gt; svg</c> 往返必然精确。</para>
-/// <para>★ <b>上色是一个开关，不是两种产物</b>。同一张图，关掉颜色就是题面线稿
+/// <para><b>上色是一个开关，不是两种产物</b>。同一张图，关掉颜色就是题面线稿
 /// （全黑）或成品剪影（纯黑块）。因此 <c>ModelToSvg</c> /
 /// <see cref="FoldedToSvg"/> / <see cref="PiecesToSvg"/> 都接受
 /// <c>color</c> 参数，视图层只管切开关，不需要为黑白/彩色各写一套生成逻辑。</para>
 /// </summary>
 public static class Svg
 {
-    /// <summary>
-
-
-
     /// <summary>
     /// 原子片分解图的配色：按面下标稳定地取一个<b>浅色</b>。
     /// <para>用黄金角步进而不是 <c>Random</c>：同一个母版在任何机器、任何平台上

@@ -7,9 +7,9 @@ namespace Origami.Core;
 /// 多边形顶点旋转、层序并列打破）。若直接依赖 <c>HashSet</c> / <c>Dictionary</c>
 /// 的迭代顺序，结果就会绑死在哈希实现上 —— 换运行时、换版本、甚至换个
 /// 插入顺序都可能变。因此所有这些位置一律<b>显式排序</b>（见 <see cref="Sorted"/>、
-/// <see cref="SortedPoints"/>），让输出只依赖输入本身。
+/// <see cref="SortedPoints"/>），让输出只依赖输入本身。线段与点用 <c>record struct</c>
+/// 的值语义相等即可，不需要自定义哈希。
 /// </para>
-/// <para>线段与点用 <c>record struct</c> 的值语义相等即可，不需要自定义哈希。</para>
 /// </summary>
 public static class SegSets
 {

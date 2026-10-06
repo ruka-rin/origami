@@ -1,9 +1,8 @@
 namespace Origami.Core;
 
 /// <summary>
-/// 方形 CP 反推长条母版字符串 —— <b>★★★★★ 逆向精确可逆</b>（不需要母版做参数）。
-/// <para>既然正向铺排是完全已知的<b>确定性状态机</b>，逆向就能<b>逐步反演</b>它而不必猜。
-/// 实测 KRENIO / PROTEIN 两题<b>逐字符精确还原</b>。</para>
+/// 方形 CP 反推长条母版字符串 —— <b>逆向精确可逆</b>（不需要母版做参数）。
+/// <para>既然正向铺排是完全已知的<b>确定性状态机</b>，逆向就能<b>逐步反演</b>它而不必猜。</para>
 /// <para><b>逆向三步</b>：
 /// <list type="number">
 /// <item><b>读出转折点</b>：转折耳 4 条线里有一条是<b>水平横档</b>，而母版折痕永远是对角或
@@ -11,7 +10,7 @@ namespace Origami.Core;
 /// <item><b>剔除耳线</b>：转折点确定后，耳线坐标完全确定，取并集与实际折痕求交即得耳线。</item>
 /// <item><b>反算 raw 坐标与端点定向</b>：<c>xOffset(Y) = -Σlimit_of(t) (t&lt;Y)</c>，
 /// <c>shift(Y) = xOffset(Y) + (2 if Y else 0)</c>；再<b>靠 y 坐标定向</b>
-/// （★ 不能按 x 大小定向 —— 那样会把 '\' 误判成 '/'）。</item>
+/// —— 不能按 x 大小定向，那样会把 '\' 误判成 '/'。</item>
 /// </list> </para>
 /// </summary>
 public static class Reverse
@@ -78,18 +77,18 @@ public static class Reverse
     {
         int square = plan.N * Layout.Unit;
 
-        // unit 制 -> unit 制（格坐标 × UNIT）
+        // 格坐标 -> 单位制（格坐标 × UNIT）
         var fold = new HashSet<Segment>();
         foreach (var (a, b) in plan.Fold)
             fold.Add(Segment.Norm(new Point(a.X * Layout.Unit, a.Y * Layout.Unit),
                                   new Point(b.X * Layout.Unit, b.Y * Layout.Unit)));
 
-        // --- 第 1 步：水平折痕 -> 转折点 ---
+        // 第 1 步：水平折痕 -> 转折点
         var horiz = fold.Where(k => Math.Abs(k.A.Y - k.B.Y) < Geom.Eps).ToList();
         var turns = horiz.Select(k => (int)Math.Round(k.A.Y) - Layout.Unit)
                          .Distinct().OrderBy(x => x).ToList();
 
-        // --- 第 2 步：剔除耳线 ---
+        // 第 2 步：剔除耳线
         var ear = new HashSet<Segment>();
         foreach (int y in turns)
             foreach (var (p, q) in EarCandidates(square, y))
@@ -101,7 +100,7 @@ public static class Reverse
         var main = new HashSet<Segment>(fold);
         main.ExceptWith(ear);
 
-        // --- 按行分组 ---
+        // 按行分组
         var rowsRaw = new Dictionary<int, List<Segment>>();
         foreach (var k in main)
         {
@@ -110,7 +109,7 @@ public static class Reverse
             l.Add(k);
         }
 
-        // --- 第 3 步：反算 raw + 端点定向 ---
+        // 第 3 步：反算 raw + 端点定向
         int ShiftOf(int y)
         {
             int xoff = 0;
@@ -141,7 +140,7 @@ public static class Reverse
                 }
                 items.Add(new RowItem { Xb = xb, Xt = xt, Seg = k });
             }
-            // ★ 行内排序键 = raw 中点 xb+xt 升序（折痕中点沿母版行进序严格递增）
+            // 行内排序键 = raw 中点 xb+xt 升序（折痕中点沿母版行进序严格递增）
             items.Sort((a, b) => a.Mid.CompareTo(b.Mid));
             outRows[y] = items;
         }
@@ -176,7 +175,7 @@ public static class Reverse
         foreach (var c in raws)
         {
             int x1 = (int)Math.Round(c.Xb), x2 = (int)Math.Round(c.Xt);
-            if (Math.Min(x1, x2) >= ncell * Layout.Unit) continue;      // 尾部填充
+            if (Math.Min(x1, x2) >= ncell * Layout.Unit) continue;      // 尾部填充折痕
             if (x1 == x2)
             {
                 int k = x1 / Layout.Unit;
@@ -218,12 +217,11 @@ public static class Reverse
     }
 
     /// <summary>
-    /// 方形 CP -&gt; 长条母版字符串（<b>精确逆向</b>）。
+    /// 方形 CP -&gt; 长条母版字符串（<b>精确逆向</b>）：逆向结果 + <b>是否有多个等价候选</b>。
     /// <para>按边长公式 <c>N = ceil(1+sqrt(M-1))</c> 反解得区间
     /// <c>M ∈ [(N-2)²+1, (N-1)²+1]</c>（<b>不是</b> <c>[(N-1)², N²]</c> —— 后者会漏掉
     /// PROTEIN 的 118），每个候选<b>正向重放</b>验证，取能逐条复现输入方形的那个。</para>
     /// </summary>
-    /// <summary>逆向结果 + <b>是否有多个等价候选</b>。</summary>
     /// <param name="Master">选出的母版（取第一个能正向复现的候选）。</param>
     /// <param name="Candidates">
     /// 能正向复现原方形的候选个数。<b>大于 1 就是歧义</b>：母版末尾的「素格 <c>.</c>
@@ -234,11 +232,9 @@ public static class Reverse
 
     /// <summary>
     /// 方形 CP -&gt; 母版，并报告歧义。
-    /// <para>
-    /// 与 <see cref="SquareToMaster"/> 同算法，区别是会数一遍到底有多少候选能正向复现。
+    /// <para>与 <see cref="SquareToMaster"/> 同算法，区别是会数一遍到底有多少候选能正向复现。
     /// 界面导入方形 SVG 时需要据此提示「这个图对应多个母版」，否则用户会以为
-    /// 拿到的串是唯一解。
-    /// </para>
+    /// 拿到的串是唯一解。</para>
     /// </summary>
     public static SquareToMasterResult SquareToMasterAmbiguous(SquarePlan plan, bool strict = true)
     {
@@ -251,13 +247,13 @@ public static class Reverse
         Master? first = null;
         int valid = 0;
 
-for (int ncell = lo; ncell <= hi; ncell++)
-    {
-        var cand = RawToMaster(raws, ncell);
-        if (!SetEq(FoldCells(cand), target)) continue;
-        first ??= cand;                       // 取第一个真正能正向复现的
-        valid++;
-    }
+        for (int ncell = lo; ncell <= hi; ncell++)
+        {
+            var cand = RawToMaster(raws, ncell);
+            if (!SetEq(FoldCells(cand), target)) continue;
+            first ??= cand;                       // 取第一个真正能正向复现的
+            valid++;
+        }
 
         // 一个都没匹配上：退回第一个候选，让调用方看到「无法复现」而不是崩溃
         if (first is null) first = RawToMaster(raws, lo);

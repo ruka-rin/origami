@@ -10,7 +10,7 @@ namespace Origami.Core;
 /// <para>坐标系：数学坐标（y 向上）。格 <c>k</c> 占 <c>[k,k+1]×[0,1]</c>。
 /// <c>/</c> 折痕从 <c>(k,0)</c> 到 <c>(k+1,1)</c>；<c>\</c> 从 <c>(k,1)</c> 到 <c>(k+1,0)</c>；
 /// pipe <c>k</c> 的折痕是 <c>(k,0)-(k,1)</c>。</para>
-/// <para>★ 长条是一张<b>连续纸带</b>：没有 <c>|</c> 的格边界上根本没有线（纸是连续的），
+/// <para>长条是一张<b>连续纸带</b>：没有 <c>|</c> 的格边界上根本没有线（纸是连续的），
 /// 只有 <c>|</c> 才是竖直折痕。这一点是整条工具链的地基。</para>
 /// </summary>
 public sealed class Master
@@ -201,7 +201,7 @@ public static class MasterOps
 
     /// <summary>
     /// 没有外部资料时的峰谷兜底：沿纸带严格交替，<b>首条为谷(V)</b>。
-    /// 这与已验证的权威 <c>长条.svg</c> 完全一致（48 条 / 24 峰 24 谷）。
+    /// 这与已验证的权威 <c>长条.svg</c> 完全一致。
     /// </summary>
     public static List<string> DefaultMv(int n)
     {

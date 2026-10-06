@@ -2,11 +2,8 @@ namespace Origami.Core;
 
 /// <summary>
 /// 长条母版 -&gt; 方形 CP 的<b>真实</b>铺排算法（<c>strip.js</c> 的逐行忠实移植）。
-/// <para>
-/// 这是唯一被权威题面图验证过的母版→方形规则。KRENIO 100 格 -&gt; N=11 折痕 80；
-/// PROTEIN 118 格 -&gt; N=12 折痕 91；ABCD 76 格 -&gt; N=10 折痕 63，均逐条零差异。
-/// </para>
-/// <para><b>单位制：1 格 = 2 单位</b>（与参考实现一致），方形边长恒为 2 的倍数。</para>
+/// <para>这是唯一被权威题面图验证过的母版→方形规则。<b>单位制：1 格 = 2 单位</b>
+/// （与参考实现一致），方形边长恒为 2 的倍数。</para>
 /// <para><b>算法全貌</b>：
 /// <list type="number">
 /// <item>母版 -&gt; 折痕序列（<c>parseEnc</c>）：<c>/</c>→<c>{xb:x, xt:x+2}</c>，
@@ -14,14 +11,13 @@ namespace Origami.Core;
 /// <c>|</c>→追加 <c>{xb:x, xt:x}</c>（不前进）。列表首尾各有一个哨兵 <c>{0,0}</c>。</item>
 /// <item>边长：<c>square = 2*ceil(1+sqrt(格数-1))</c>，<c>N = square/2</c>。</item>
 /// <item>尾部填充：按「对角+竖直」交替补到 <c>total = 2*(N*(N-2)+2)</c>。</item>
-/// <item>蛇形铺排 + 转折耳：每次翻行画 <b>4 条</b>结构线（缺一不可）。</item>
-/// <item>行容量：<c>limit</c> 首行/末行 N-1 格，中间行 N-2 格。</item>
-/// <item>转折后补偿：<c>if (yOffset) { xt+=2; xb+=2; limit+=2; }</c>。</item>
-/// <item>左右交替：奇数行把 x 镜像 <c>x -&gt; square-x</c> 并交换 y1/y2。</item>
-/// <item>峰谷：按<b>绘制顺序</b>严格交替，首条为蓝（谷）。</item>
-/// <item>剪切线：<c>outerStroke</c> 的水平实线，整行贯通。</item>
-/// </list>
-/// </para>
+/// <item>蛇形铺排 + 转折耳：每次翻行画 <b>4 条</b>结构线（缺一不可）。
+/// 行容量 <c>limit</c> 首行/末行 N-1 格，中间行 N-2 格。</item>
+/// <item>转折后补偿：<c>if (yOffset) { xt+=2; xb+=2; limit+=2; }</c>。
+/// 奇数行把 x 镜像 <c>x -&gt; square-x</c> 并交换 y1/y2。</item>
+/// <item>峰谷：按<b>绘制顺序</b>严格交替，首条为蓝（谷）。
+/// 剪切线：<c>outerStroke</c> 的水平实线，整行贯通。</item>
+/// </list></para>
 /// </summary>
 public static class Layout
 {
@@ -57,7 +53,7 @@ public static class Layout
     /// <summary>
     /// 母版格数 -&gt; 方形边长（单位制，2 的倍数）。
     /// <c>square = 2*ceil(1+sqrt(格数-1))</c>。
-    /// <para>★ <c>N</c> 至少为 2：<c>N=1</c> 时行容量为 0，铺排状态机会死循环。</para>
+    /// <para><c>N</c> 至少为 2：<c>N=1</c> 时行容量为 0，铺排状态机会死循环。</para>
     /// </summary>
     public static int ChooseSquare(int ncell)
     {
@@ -80,9 +76,8 @@ public static class Layout
 
     /// <summary>
     /// 按「对角 + 竖直」交替补到 <c>total</c>。
-    /// <para>收尾形态由循环退出点决定：
-    /// 母版末条折痕是对角 -&gt; 填充以对角起头；是竖直 -&gt; 填充全是竖直（ABCD 型）；
-    /// 余量为偶数格 -&gt; 成对填满。</para>
+    /// <para>收尾形态由循环退出点决定：母版末条折痕是对角 -&gt; 填充以对角起头；
+    /// 是竖直 -&gt; 填充全是竖直（ABCD 型）；余量为偶数格 -&gt; 成对填满。</para>
     /// </summary>
     public static List<RawCrease> PadCreases(List<RawCrease> creases, int total)
     {
@@ -177,7 +172,7 @@ public static class Layout
             int xb = cr.Xb + xState;
 
             // 转折：画 4 条结构线，然后翻到下一行。
-            // ★ afterTurn 在 yOffset 自增「之前」被调用，故用转折前的 yOffset 做镜像判断。
+            // afterTurn 在 yOffset 自增「之前」被调用，故用转折前的 yOffset 做镜像判断。
             char afterTurn = '\0';
             while (xt > limit || xb > limit)
             {

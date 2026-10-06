@@ -25,7 +25,7 @@ public sealed class Fold
 /// { kind: 'strip'|'square', N, ncell, cut: [[a,b],...],
 ///   folds: [{seg:[[ax,ay],[bx,by]], mv:'M'|'V'}], border: [[a,b],...] }
 /// </code>
-/// <para><b>坐标系（★ 两套，别混）</b>：<c>strip</c> 是<b>数学坐标 y 向上</b>；
+/// <para><b>坐标系（两套，别混）</b>：<c>strip</c> 是<b>数学坐标 y 向上</b>；
 /// <c>square</c> 是<b>屏幕坐标 y 向下</b>，与原题图一致。</para>
 /// <para><b>峰谷</b>：长条约定为沿纸带严格红蓝交替、<b>首条为蓝（谷）</b>；
 /// 方形优先读 <c>fold_mv</c>（铺排时按绘制顺序交替写入，物理正确），无则按排序兜底。</para>
@@ -44,9 +44,7 @@ public sealed class Model
     /// <summary>长条母版的 pipe 位置（逆向辅助，不参与几何）。</summary>
     public List<int>? Pipes { get; set; }
 
-    // ==================================================================
-    //  长条
-    // ==================================================================
+    // ---- 长条 ----
 
     public static Model StripModel(Master master, List<string>? mv = null)
     {
@@ -106,9 +104,7 @@ public sealed class Model
         return Master.ParseMaster(sb.ToString());
     }
 
-    // ==================================================================
-    //  方形
-    // ==================================================================
+    // ---- 方形 ----
 
     /// <summary>
     /// 方形 CP 计划 -&gt; 数据模型。
@@ -165,9 +161,7 @@ public sealed class Model
         return l;
     }
 
-    // ==================================================================
-    //  校验
-    // ==================================================================
+    // ---- 校验 ----
 
     /// <summary>返回问题列表（空 = 通过）。</summary>
     public static List<string> CheckModel(Model model)
