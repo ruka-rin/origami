@@ -1,0 +1,106 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Origami.Desktop"
+        mc:Ignorable="d" d:DesignWidth="460" d:DesignHeight="520"
+        x:Class="Origami.Desktop.HelpDialog"
+        Title="操作说明" Width="460" Height="540"
+        CanResize="True" ShowInTaskbar="False" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource Bgc.Chrome}">
+
+  <Window.Styles>
+    <!-- 说明条目：键位/动作 + 说明，两列对齐 -->
+    <Style Selector="TextBlock.k">
+      <Setter Property="FontFamily" Value="Consolas,Menlo,DejaVu Sans Mono,monospace" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{StaticResource Fg.Base}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.v">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{StaticResource Fg.Base}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+  </Window.Styles>
+
+  <Grid Margin="26" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" Text="操作说明" FontSize="15" FontWeight="SemiBold"
+               Foreground="{StaticResource Fg.Strong}" />
+
+    <!-- 画布 -->
+    <StackPanel Grid.Row="1" Margin="0,22,0,0" Spacing="0">
+      <TextBlock Classes="section" Text="画布" />
+      <Grid ColumnDefinitions="128,*" RowDefinitions="Auto,Auto,Auto,Auto">
+        <TextBlock Grid.Row="0" Grid.Column="0" Classes="k" Text="滚轮" />
+        <TextBlock Grid.Row="0" Grid.Column="1" Classes="v" Text="缩放，以光标为锚点" />
+        <TextBlock Grid.Row="1" Grid.Column="0" Classes="k" Text="左键拖动" Margin="0,7,0,0" />
+        <TextBlock Grid.Row="1" Grid.Column="1" Classes="v" Text="平移画面" Margin="0,7,0,0" />
+        <TextBlock Grid.Row="2" Grid.Column="0" Classes="k" Text="右键单击" Margin="0,7,0,0" />
+        <TextBlock Grid.Row="2" Grid.Column="1" Classes="v" Text="适应窗口" Margin="0,7,0,0" />
+        <TextBlock Grid.Row="3" Grid.Column="0" Classes="k" Text="双击" Margin="0,7,0,0" />
+        <TextBlock Grid.Row="3" Grid.Column="1" Classes="v" Text="在 1:1 与适应窗口之间切换" Margin="0,7,0,0" />
+      </Grid>
+    </StackPanel>
+
+    <!-- 视图 -->
+    <StackPanel Grid.Row="2" Margin="0,20,0,0" Spacing="0">
+      <TextBlock Classes="section" Text="视图" />
+      <Grid ColumnDefinitions="128,*" RowDefinitions="Auto,Auto">
+        <TextBlock Grid.Row="0" Grid.Column="0" Classes="k" Text="左上角" />
+        <TextBlock Grid.Row="0" Grid.Column="1" Classes="v"
+                   Text="切换纸面形状：长条 / 方形" />
+        <TextBlock Grid.Row="1" Grid.Column="0" Classes="k" Text="右上角" Margin="0,7,0,0" />
+        <TextBlock Grid.Row="1" Grid.Column="1" Classes="v" Margin="0,7,0,0"
+                   Text="切换图面内容：折痕图 / 成品 / 原子片，旁边的开关控制上色" />
+      </Grid>
+    </StackPanel>
+
+    <!-- 输入 -->
+    <StackPanel Grid.Row="3" Margin="0,20,0,0" Spacing="0">
+      <TextBlock Classes="section" Text="输入" />
+      <Grid ColumnDefinitions="128,*" RowDefinitions="Auto,Auto">
+        <TextBlock Grid.Row="0" Grid.Column="0" Classes="k" Text="母版框" />
+        <TextBlock Grid.Row="0" Grid.Column="1" Classes="v"
+                   Text="回车或点别处即渲染" />
+        <TextBlock Grid.Row="1" Grid.Column="0" Classes="k" Text="文本框" Margin="0,7,0,0" />
+        <TextBlock Grid.Row="1" Grid.Column="1" Classes="v" Margin="0,7,0,0"
+                   Text="由折纸字库生成母版，写进母版框（支持 A-Z 0-9 与空格）" />
+      </Grid>
+    </StackPanel>
+
+    <!-- 方向 -->
+    <StackPanel Grid.Row="4" Margin="0,20,0,0" Spacing="0">
+      <TextBlock Classes="section" Text="画布方向" />
+      <TextBlock Classes="v"
+                 Text="右下角四个按钮可旋转与镜像。它们同时作用于预览与导出 —— 屏幕上是哪个方向，存到文件里就是哪个方向。" />
+    </StackPanel>
+
+    <!-- 导出 -->
+    <StackPanel Grid.Row="5" Margin="0,20,0,0" Spacing="0">
+      <TextBlock Classes="section" Text="导入与导出" />
+      <TextBlock Classes="v" TextWrapping="Wrap"
+                 Text="「导入…」识别母版文本与折痕图 SVG（彩色、黑白都支持，格式由内容自动判别）。「保存…」可选 SVG 矢量或 PNG 位图，并设置配色与分辨率。" />
+    </StackPanel>
+
+    <Rectangle Grid.Row="7" Classes="hairline" Margin="0,24,0,0" />
+
+    <Button Grid.Row="8" Grid.ColumnSpan="3" Content="知道了" MinWidth="96"
+            HorizontalAlignment="Right" Margin="0,16,0,0" IsDefault="True"
+            Click="OnClose" />
+  </Grid>
+</Window>

@@ -23,8 +23,17 @@ public partial class MainWindow : Window
         // 导入完成后要按目标视图的取景方式复位预览
         _vm.ViewerFit = tab => { if (tab is not null) Viewer.DefaultFit = EffectiveFit(tab); };
 
-        // 打开「文本生成母版」时，文本框直接获得焦点，省掉一次点击
+        // 打开「文本」时输入框直接获得焦点，省掉一次点击
         _vm.TextBoxRequested = () => TextBox.Focus();
+
+        // 视图切换走 IsCheckedChanged 而非双向绑定写回：
+        // RadioButton 先改自己的 IsChecked（GroupName 同时取消同组其它项），
+        // 再由这里写 VM；反向绑定会在初始化阶段两边互相回写，把单选状态搅乱。
+        ShapeStrip.IsCheckedChanged += (_, _) => { if (ShapeStrip.IsChecked == true) ApplyShape(ShapeKind.Strip); };
+        ShapeSquare.IsCheckedChanged += (_, _) => { if (ShapeSquare.IsChecked == true) ApplyShape(ShapeKind.Square); };
+        ContentCrease.IsCheckedChanged += (_, _) => { if (ContentCrease.IsChecked == true) ApplyContent(ContentKind.Crease); };
+        ContentFolded.IsCheckedChanged += (_, _) => { if (ContentFolded.IsChecked == true) ApplyContent(ContentKind.Folded); };
+        ContentPieces.IsCheckedChanged += (_, _) => { if (ContentPieces.IsChecked == true) ApplyContent(ContentKind.Pieces); };
     }
 
     protected override void OnOpened(EventArgs e)
@@ -118,22 +127,41 @@ public partial class MainWindow : Window
     /// 但转过 90° 之后它就变成 1 格 × 100 格的<b>竖条</b>了 —— 此时再铺满宽度，
     /// 整张图会被压成宽度接近 0 的一条线。所以奇数次旋转时退回「适应窗口」。</para>
     /// </summary>
-    FitMode EffectiveFit(ViewTab tab)
+    FitMode EffectiveFit(ViewTab tab) => EffectiveFit(tab.Fit);
+
+    /// <summary>取景模式 + 当前方向 -> 实际取景方式。参数是视图声明的默认取景。</summary>
+    FitMode EffectiveFit(FitMode declared)
     {
-        if (tab.Fit == FitMode.Width && _vm.Xform.QuarterTurns % 2 == 1)
+        // 长条折痕图转过 90° 后成了竖条，再「铺满宽度」会被压成一条线
+        if (declared == FitMode.Width && _vm.Xform.QuarterTurns % 2 == 1)
             return FitMode.Window;
-        return tab.Fit;
+        return declared;
     }
 
-    async void OnTabChanged(object? sender, SelectionChangedEventArgs e)
+    // ------------------------------------------------------------ 视图切换
+    //
+    // 6 种视图 = 2 形状 × 3 内容，界面上拆成两组单选：左上角切形状、
+    // 右上角切内容，互斥由 RadioButton 的 GroupName 保证。
+
+    void ApplyShape(ShapeKind shape)
     {
-        if (e.AddedItems.Count == 0) return;
-        if (e.AddedItems[0] is not ViewTab tab) return;
-
-        // 顺序很重要：先定取景模式，再让 VM 换图（换图会触发复位）
-        Viewer.DefaultFit = EffectiveFit(tab);
-        await _vm.SelectViewAsync(tab);
+        if (_vm.Shape == shape) return;
+        // 顺序重要：先定取景模式，再换图（换图会触发视图复位）
+        Viewer.DefaultFit = EffectiveFit(Views.Resolve(shape, _vm.Content).Fit);
+        _vm.Shape = shape;
     }
+
+    void ApplyContent(ContentKind content)
+    {
+        if (_vm.Content == content) return;
+        Viewer.DefaultFit = EffectiveFit(Views.Resolve(_vm.Shape, content).Fit);
+        _vm.Content = content;
+    }
+
+    // ------------------------------------------------------------ 帮助
+
+    async void OnShowHelp(object? sender, RoutedEventArgs e)
+        => await new HelpDialog().ShowDialog(this);
 
     // ------------------------------------------------------------ 导入
 

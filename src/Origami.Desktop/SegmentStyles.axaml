@@ -1,0 +1,63 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <!--
+      分段选项：整行可点的卡片，用于「长条/方形」「折痕图/成品/原子片」这类互斥选择。
+
+      用 ControlTemplate 整体换掉 RadioButton 的默认外观（圆点 + 文字），
+      圆点与文字一起消失，选中态改由背景表达 ——
+      裸 RadioButton 的圆点很小，点文字不生效，点击热区只有圆点那么大。
+
+      必须让 RadioButton 本身承担交互（配 GroupName 做互斥）：
+      曾用「Border 画卡片 + 透明 RadioButton 叠放」实现，结果丢掉了 GroupName
+      互斥关系，且透明层 IsHitTestVisible=False 让选中状态无法取消。
+
+      ControlTheme 必须放在 Styles.Resources 里 —— 直接放在 Styles 集合下不合法。
+    -->
+    <ControlTheme x:Key="SegmentOption" TargetType="RadioButton"
+                  BasedOn="{StaticResource {x:Type RadioButton}}">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{StaticResource Fg.Base}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+
+      <Style Selector="^:pointerover">
+        <Setter Property="Background" Value="{StaticResource Bgc.Hover}" />
+      </Style>
+      <Style Selector="^:checked">
+        <Setter Property="Background" Value="{StaticResource Accent}" />
+        <Setter Property="Foreground" Value="#FFFFFF" />
+      </Style>
+      <Style Selector="^:disabled">
+        <Setter Property="Foreground" Value="{StaticResource Fg.Faint}" />
+      </Style>
+    </ControlTheme>
+  </Styles.Resources>
+
+  <!--
+    画布上的分段选择器：默认弱化（半透明），悬停才清晰 ——
+    画布的主角是折痕图本身，控件不该一直抢注意力。
+  -->
+  <Style Selector="RadioButton.ghost">
+    <Setter Property="Opacity" Value="0.75" />
+  </Style>
+  <Style Selector="RadioButton.ghost:pointerover">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+</Styles>

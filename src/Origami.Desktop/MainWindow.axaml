@@ -3,273 +3,251 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Origami.Desktop"
-        mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="720"
+        mc:Ignorable="d" d:DesignWidth="1320" d:DesignHeight="760"
         x:Class="Origami.Desktop.MainWindow"
         Title="折纸谜题工具 — 母版到成品"
-        Width="1320" Height="760" MinWidth="960" MinHeight="600"
+        Width="1320" Height="760" MinWidth="900" MinHeight="560"
         Background="{StaticResource Bgc.Base}">
 
   <Window.Styles>
-    <Style Selector="ListBox.viewlist">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Padding" Value="0" />
+    <!--
+      画布浮层：平时半透明、不抢画面，鼠标移上去才实心。
+      好处是画布没有任何常驻边框，信息（折痕图）才是主角。
+    -->
+    <Style Selector="Border.overlay">
+      <Setter Property="Background" Value="#B01A1A1F" />
+      <Setter Property="CornerRadius" Value="{StaticResource Rounded.Panel}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="#00FFFFFF" />
     </Style>
-    <Style Selector="ListBox.viewlist ListBoxItem">
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="CornerRadius" Value="{StaticResource Rounded.Control}" />
-      <Setter Property="Background" Value="Transparent" />
+    <Style Selector="Border.overlay:pointerover">
+      <Setter Property="Background" Value="#F21E1E24" />
+      <Setter Property="BorderBrush" Value="{StaticResource Bdr.Hairline}" />
     </Style>
-    <Style Selector="ListBox.viewlist ListBoxItem:pointerover">
+
+    <!-- 方向按钮：等宽等高成组，默认弱化，悬停高亮 -->
+    <Style Selector="Button.dir">
+      <Setter Property="Width" Value="34" />
+      <Setter Property="Height" Value="30" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0,0,6,0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style Selector="Button.dir:pointerover /template/ ContentPresenter">
       <Setter Property="Background" Value="{StaticResource Bgc.Hover}" />
     </Style>
-    <Style Selector="ListBox.viewlist ListBoxItem:selected">
-      <Setter Property="Background" Value="{StaticResource Accent.Soft}" />
-    </Style>
 
-    <!-- 方向按钮：紧凑方形，等宽等高 -->
-    <Style Selector="Button.icon">
-      <Setter Property="Width" Value="36" />
-      <Setter Property="Height" Value="32" />
+    <!-- 帮助按钮 -->
+    <Style Selector="Button.help">
+      <Setter Property="Background" Value="#B01A1A1F" />
+      <Setter Property="Width" Value="28" />
+      <Setter Property="Height" Value="28" />
       <Setter Property="Padding" Value="0" />
-      <Setter Property="FontSize" Value="15" />
-      <Setter Property="Margin" Value="0,0,6,0" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="#00FFFFFF" />
     </Style>
-
-    <!-- 侧栏分组标题 -->
-    <Style Selector="TextBlock.group">
-      <Setter Property="FontSize" Value="10.5" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{StaticResource Fg.Faint}" />
-      <Setter Property="Margin" Value="2,0,0,7" />
+    <Style Selector="Button.help:pointerover">
+      <Setter Property="Background" Value="{StaticResource Accent}" />
+      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
     </Style>
   </Window.Styles>
 
   <DockPanel LastChildFill="True">
 
-    <!-- ═══════════════顶栏 ═══════════════
-         母版与「文本生成母版」上下两行：母版串是主体，文本只是个入口。
-         两行结构同构，标签字号一致（都是 12），视觉上是平级的两种输入。 -->
+    <!-- ═══════════ 顶栏 ═══════════
+         「文本」在「母版」上方：文本是可选的辅助入口，母版才是主体输入。
+         两行的标签列宽相同、输入框共享同一列定义，因此左右边界严格对齐、
+         宽度一致，且都随窗口拉伸占满可用空间。 -->
     <Border DockPanel.Dock="Top" Background="{StaticResource Bgc.Chrome}">
-      <Grid Margin="18,12" RowDefinitions="Auto,Auto,Auto">
+      <Grid Margin="18,12"
+            ColumnDefinitions="72,Auto,*"
+            RowDefinitions="Auto,Auto,Auto">
+        <Grid.ColumnDefinitions>
+          <!-- 标签列固定宽度：保证「文本」与「母版」两行的输入框左边界一致 -->
+          <ColumnDefinition Width="72" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" MinWidth="0" />
+        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- 标题行 -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,11">
-          <TextBlock Grid.Column="0" Text="折纸谜题工具" VerticalAlignment="Center"
-                     FontSize="14" FontWeight="SemiBold"
-                     Foreground="{StaticResource Fg.Strong}" />
-          <TextBlock Grid.Column="1" Foreground="{StaticResource Fg.Faint}" FontSize="11"
-                     VerticalAlignment="Center"
-                     Text="回车或点别处即渲染" />
-        </Grid>
+        <!-- 标题行：右侧放主操作 -->
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="3" Text="折纸谜题工具"
+                   FontSize="14" FontWeight="SemiBold"
+                   Foreground="{StaticResource Fg.Strong}" Margin="0,0,0,11" />
 
-        <!-- 母版行。* 列必须显式 MinWidth="0"：
-             ColumnDefinition 的 MinWidth 默认是 Auto，会先按子控件 DesiredSize 兜底；
-             母版串有109 字符，不置0 就会把顶栏撑到比窗口还宽、按钮被挤出可视区。 -->
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" />
-            <!-- MinWidth="0" 必须显式写，见上方说明 -->
-            <ColumnDefinition Width="*" MinWidth="0" />
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="Auto" />
-          </Grid.ColumnDefinitions>
+        <!-- 文本行。开关与文本框同行相邻：开关的意义就是「旁边那个框现在可用」。
+             标签用独立 TextBlock 与开关并排 —— ToggleSwitch 的 Content 会画在滑块旁边，
+             两者混成一块。On/Off 置空，说明放 ToolTip。 -->
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="文本"
+                   VerticalAlignment="Center" FontSize="12"
+                   Foreground="{StaticResource Fg.Muted}" />
 
-          <TextBlock Grid.Column="0" Text="母版" VerticalAlignment="Center"
-                     FontSize="12" Foreground="{StaticResource Fg.Muted}"
-                     Margin="0,0,12,0" MinWidth="84" />
+        <ToggleSwitch Grid.Row="1" Grid.Column="1"
+                      IsChecked="{Binding IsTextMode, Mode=TwoWay}"
+                      IsEnabled="{Binding !Busy}"
+                      OnContent="" OffContent=""
+                      VerticalAlignment="Center" Margin="0,0,10,0"
+                      ToolTip.Tip="打开后右边出现文本输入框，输入普通文本（如 KRENIO）由折纸字库生成母版" />
 
-          <TextBox Grid.Column="1" x:Name="MasterBox"
-                   Text="{Binding MasterText}"
-                   Watermark="输入母版字符串，例如 /....|../.."
-                   FontFamily="Consolas,Menlo,DejaVu Sans Mono,monospace"
-                   FontSize="13"
-                   AcceptsReturn="False"
-                   KeyDown="OnMasterKeyDown" LostFocus="OnMasterLostFocus"
-                   IsEnabled="{Binding !Busy}" />
+        <TextBox Grid.Row="1" Grid.Column="2" x:Name="TextBox"
+                 Text="{Binding TextInput}"
+                 Watermark="{Binding TextWatermark}"
+                 FontFamily="Consolas,Menlo,DejaVu Sans Mono,monospace"
+                 FontSize="13"
+                 AcceptsReturn="False"
+                 KeyDown="OnTextKeyDown" LostFocus="OnTextLostFocus"
+                 IsVisible="{Binding IsTextMode}"
+                 IsEnabled="{Binding !Busy}"
+                 ToolTip.Tip="回车或点别处即生成母版，结果写进下面的母版框" />
 
-          <!-- 导入不做二次确认：格式（母版文本/ 长条 SVG / 方形 SVG）由内容自动判别 -->
-          <Button Grid.Column="2" Content="导入…" MinWidth="84" Margin="10,0,0,0"
+        <!-- 母版行 -->
+        <TextBlock Grid.Row="2" Grid.Column="0" Text="母版"
+                   VerticalAlignment="Center" FontSize="12"
+                   Foreground="{StaticResource Fg.Muted}" Margin="0,10,0,0" />
+
+        <TextBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2"
+                 x:Name="MasterBox"
+                 Text="{Binding MasterText}"
+                 Watermark="输入母版字符串，例如 /....|../.."
+                 FontFamily="Consolas,Menlo,DejaVu Sans Mono,monospace"
+                 FontSize="13"
+                 Margin="0,10,0,0"
+                 AcceptsReturn="False"
+                 KeyDown="OnMasterKeyDown" LostFocus="OnMasterLostFocus"
+                 IsEnabled="{Binding !Busy}" />
+
+        <!-- 导入不做二次确认：格式（母版文本 / 长条 SVG / 方形 SVG）由内容自动判别 -->
+      </Grid>
+    </Border>
+
+    <!-- ═══════════ 底栏：状态 ═══════════ -->
+    <Border DockPanel.Dock="Bottom" Background="{StaticResource Bgc.Chrome}">
+      <Grid Margin="18,8" ColumnDefinitions="Auto,*,Auto,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding Status}" Foreground="{StaticResource Fg.Muted}"
+                   VerticalAlignment="Center" Margin="0,0,20,0"
+                   TextTrimming="CharacterEllipsis" MaxWidth="280" />
+        <TextBlock Grid.Column="1" Text="{Binding Summary}" Foreground="{StaticResource Fg.Base}"
+                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        <TextBlock Grid.Column="2" Text="{Binding ZoomText}" Foreground="{StaticResource Fg.Muted}"
+                   VerticalAlignment="Center" MinWidth="60" Margin="20,0,0,0"
+                   TextAlignment="Right" />
+
+        <!-- 导入 / 保存收进底栏：顶栏只留输入，减少视觉噪声 -->
+        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" Margin="16,0,0,0">
+          <Button Content="导入…" MinWidth="76" Padding="12,4" FontSize="11.5"
                   Click="OnImport" IsEnabled="{Binding !Busy}"
                   ToolTip.Tip="导入母版文本，或长条 / 方形折痕图 SVG（彩色与黑白都支持）" />
-
-          <Button Grid.Column="3" Content="保存…" MinWidth="84" Margin="8,0,0,0"
+          <Button Content="保存…" MinWidth="76" Padding="12,4" FontSize="11.5"
                   Click="OnSave" IsEnabled="{Binding !Busy}" />
-        </Grid>
-
-        <!-- 文本生成母版行：开关与文本框同行相邻，开关的意义就是「旁边那个框现在可用」 -->
-        <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*" Margin="0,8,0,0">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="*" MinWidth="0" />
-          </Grid.ColumnDefinitions>
-
-          <TextBlock Grid.Column="0" Text="文本生成母版" VerticalAlignment="Center"
-                     FontSize="12" Foreground="{StaticResource Fg.Muted}"
-                     Margin="0,0,12,0" MinWidth="84" />
-
-          <!-- 标签用独立 TextBlock 与开关并排：ToggleSwitch 的 Content 会画在滑块旁边，
-               两者混成一块。On/Off 置空，说明放 ToolTip。 -->
-          <ToggleSwitch Grid.Column="1" x:Name="ModeSwitch"
-                        IsChecked="{Binding IsTextMode, Mode=TwoWay}"
-                        IsEnabled="{Binding !Busy}"
-                        OnContent="" OffContent=""
-                        VerticalAlignment="Center"
-                        ToolTip.Tip="打开后右边出现文本输入框，输入普通文本（如 KRENIO）由折纸字库生成母版" />
-
-          <TextBox Grid.Column="2" x:Name="TextBox"
-                   Text="{Binding TextInput}"
-                   Watermark="{Binding TextWatermark}"
-                   FontFamily="Consolas,Menlo,DejaVu Sans Mono,monospace"
-                   FontSize="13"
-                   AcceptsReturn="False"
-                   KeyDown="OnTextKeyDown" LostFocus="OnTextLostFocus"
-                   IsVisible="{Binding IsTextMode}"
-                   IsEnabled="{Binding !Busy}"
-                   ToolTip.Tip="回车或点别处即生成母版，结果写进上面的母版框" />
-        </Grid>
+        </StackPanel>
       </Grid>
     </Border>
 
-    <!-- ═══════════════ 底栏：状态 ═══════════════ -->
-    <Border DockPanel.Dock="Bottom" Background="{StaticResource Bgc.Chrome}">
-      <Grid Margin="18,8" ColumnDefinitions="*,Auto,Auto">
-        <TextBlock Grid.Column="0" Text="{Binding Status}" Foreground="{StaticResource Fg.Muted}"
-                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-        <TextBlock Grid.Column="1" Text="{Binding Summary}" Foreground="{StaticResource Fg.Base}"
-                   VerticalAlignment="Center" Margin="0,0,20,0" />
-        <TextBlock Grid.Column="2" Text="{Binding ZoomText}" Foreground="{StaticResource Fg.Muted}"
-                   VerticalAlignment="Center" MinWidth="60" TextAlignment="Right" />
-      </Grid>
-    </Border>
+    <!-- ═══════════ 主体：整块画布 ═══════════ -->
+    <Grid ClipToBounds="True">
+      <local:SvgView x:Name="Viewer" Source="{Binding SvgSource}" />
 
-    <!-- ═══════════════ 主体 ═══════════════ -->
-    <Grid ColumnDefinitions="Auto,*">
-
-      <!-- 左侧栏。缩放只用鼠标（滚轮缩放 / 拖动平移 / 右键复位 / 双击 1:1），故无缩放按钮面板。 -->
-      <Border Grid.Column="0" Width="212" Background="{StaticResource Bgc.Sunken}">
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
-          <StackPanel Margin="14,16" Spacing="18">
-
-            <!-- 视图选择 -->
-            <StackPanel Spacing="0">
-              <TextBlock Classes="group" Text="视图" />
-              <ListBox Classes="viewlist" x:Name="ViewList"
-                       ItemsSource="{Binding ViewTabs}"
-                       SelectedItem="{Binding SelectedTab, Mode=TwoWay}"
-                       SelectionChanged="OnTabChanged">
-                <ListBox.ItemTemplate>
-                  <DataTemplate x:DataType="local:ViewTab">
-                    <Grid ColumnDefinitions="3,Auto,*" Margin="9,7">
-                      <Border Grid.Column="0" Width="3" Height="15" CornerRadius="2"
-                              Background="{StaticResource Accent}" />
-                      <TextBlock Grid.Column="1" Text="{Binding Group}" FontSize="11"
-                                 Foreground="{StaticResource Fg.Muted}"
-                                 Margin="9,0" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="12.5"
-                                 Foreground="{StaticResource Fg.Base}" VerticalAlignment="Center" />
-                    </Grid>
-                  </DataTemplate>
-                </ListBox.ItemTemplate>
-              </ListBox>
-            </StackPanel>
-
-            <Rectangle Classes="hairline" />
-
-            <!-- 上色是一个开关，不是两组视图：关 = 全黑线稿/剪影，开 = 峰谷配色。
-                 原子片分解每面一色，开关对它无意义（绑定 CanColorize 禁用）。 -->
-            <StackPanel Spacing="0">
-              <TextBlock Classes="group" Text="显示" />
-              <Grid ColumnDefinitions="Auto,Auto" HorizontalAlignment="Left">
-                <TextBlock Grid.Column="0" Text="上色" VerticalAlignment="Center"
-                           Foreground="{StaticResource Fg.Base}" FontSize="12" Margin="0,0,10,0" />
-                <ToggleSwitch Grid.Column="1" x:Name="ColorSwitch"
-                              IsChecked="{Binding IsColorOn, Mode=TwoWay}"
-                              IsEnabled="{Binding CanColorize}"
-                              OnContent="" OffContent=""
-                              VerticalAlignment="Center"
-                              ToolTip.Tip="关掉颜色只看形状：折痕图变题面线稿，成品变剪影" />
-              </Grid>
-            </StackPanel>
-
-            <Rectangle Classes="hairline" />
-
-            <!-- 画布方向：给整张图一个方向变换，而不是改折叠算法的方向约定 ——
-                 同一张母版可以来回对照，且导出直接继承这里的状态。
-                 只提供整点旋转与镜像：任意角度在位图上要重采样、矢量上要变形路径，两边对不上；
-                 整点旋转是精确的像素置换。 -->
-            <StackPanel Spacing="0">
-              <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-                <TextBlock Grid.Column="0" Classes="group" Text="画布方向" Margin="2,0,0,0" />
-                <TextBlock Grid.Column="1" Text="{Binding XformDescription}"
-                           FontSize="10" Foreground="{StaticResource Fg.Faint}"
-                           VerticalAlignment="Center" />
-              </Grid>
-
-              <StackPanel Orientation="Horizontal" Margin="-2,0,0,0">
-                <Button Classes="icon" Content="↺" Click="OnRotateCcw"
-                        IsEnabled="{Binding !Busy}" ToolTip.Tip="逆时针旋转 90°" />
-                <Button Classes="icon" Content="↻" Click="OnRotateCw"
-                        IsEnabled="{Binding !Busy}" ToolTip.Tip="顺时针旋转 90°" />
-                <Button Classes="icon" Content="⇋" Click="OnMirrorX"
-                        IsEnabled="{Binding !Busy}" ToolTip.Tip="左右镜像" />
-                <Button Classes="icon" Content="⇅" Margin="0" Click="OnMirrorY"
-                        IsEnabled="{Binding !Busy}" ToolTip.Tip="上下镜像" />
-              </StackPanel>
-
-              <Button Content="恢复原始方向" Margin="0,10,0,0" Height="28" FontSize="11"
-                      HorizontalAlignment="Stretch" Click="OnResetXform"
-                      IsEnabled="{Binding CanResetXform}"
-                      ToolTip.Tip="清掉所有旋转与镜像" />
-            </StackPanel>
-
-            <Rectangle Classes="hairline" />
-
-            <!-- 操作说明 -->
-            <StackPanel Spacing="0">
-              <TextBlock Classes="group" Text="鼠标操作" />
-              <TextBlock Classes="hint"
-                         Text="滚轮缩放（以光标为锚点）&#10;左键拖动平移&#10;右键单击适应窗口&#10;双击 1:1 / 适应切换" />
-              <TextBlock Classes="hint" Margin="0,10,0,0"
-                         FontSize="10" Foreground="{StaticResource Fg.Faint}"
-                         Text="方向会一并应用到导出的 SVG 与 PNG，导出时不再单独询问。" />
-            </StackPanel>
-
-          </StackPanel>
-        </ScrollViewer>
+      <!-- 左上角：形状（长条 / 方形）。GroupName 保证两项互斥。 -->
+      <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="14"
+              Classes="overlay" Padding="5">
+        <StackPanel Orientation="Horizontal" Spacing="0">
+          <RadioButton x:Name="ShapeStrip" GroupName="shape"
+                       Theme="{StaticResource SegmentOption}" Classes="ghost"
+                       Margin="0,0,4,0" Content="长条"
+                       IsChecked="{Binding Shape, Mode=OneWay, Converter={StaticResource ShapeToBool}, ConverterParameter=Strip}" />
+          <RadioButton x:Name="ShapeSquare" GroupName="shape"
+                       Theme="{StaticResource SegmentOption}" Classes="ghost"
+                       Content="方形"
+                       IsChecked="{Binding Shape, Mode=OneWay, Converter={StaticResource ShapeToBool}, ConverterParameter=Square}" />
+        </StackPanel>
       </Border>
 
-      <!-- 右侧：矢量预览 -->
-      <Grid Grid.Column="1" ClipToBounds="True">
-        <local:SvgView x:Name="Viewer" Source="{Binding SvgSource}" />
+      <!-- 右上角：内容（折痕图 / 成品 / 原子片）+ 上色开关 -->
+      <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="14"
+              Classes="overlay" Padding="5">
+        <StackPanel Orientation="Horizontal" Spacing="0">
+          <RadioButton x:Name="ContentCrease" GroupName="content"
+                       Theme="{StaticResource SegmentOption}" Classes="ghost"
+                       Margin="0,0,4,0" Content="折痕图"
+                       IsChecked="{Binding Content, Mode=OneWay, Converter={StaticResource ContentToBool}, ConverterParameter=Crease}" />
+          <RadioButton x:Name="ContentFolded" GroupName="content"
+                       Theme="{StaticResource SegmentOption}" Classes="ghost"
+                       Margin="0,0,4,0" Content="成品"
+                       IsChecked="{Binding Content, Mode=OneWay, Converter={StaticResource ContentToBool}, ConverterParameter=Folded}" />
+          <RadioButton x:Name="ContentPieces" GroupName="content"
+                       Theme="{StaticResource SegmentOption}" Classes="ghost"
+                       Content="原子片"
+                       IsChecked="{Binding Content, Mode=OneWay, Converter={StaticResource ContentToBool}, ConverterParameter=Pieces}" />
+          <!-- 上色开关与内容切换用竖线分隔，避免被当成同一组 -->
+          <Rectangle Width="1" Margin="8,6" Fill="{StaticResource Bdr.Hairline}" />
+          <ToggleSwitch x:Name="ColorSwitch"
+                        IsChecked="{Binding IsColorOn, Mode=TwoWay}"
+                        IsEnabled="{Binding CanColorize}"
+                        OnContent="" OffContent=""
+                        VerticalAlignment="Center" Margin="4,0,6,0"
+                        ToolTip.Tip="上色：关掉颜色只看形状（折痕图变线稿，成品变剪影）" />
+        </StackPanel>
+      </Border>
 
-        <!-- 忙碌遮罩 -->
-        <Border IsVisible="{Binding Busy}" Background="{StaticResource Bgc.Scrim}">
-          <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14">
-            <ProgressBar IsIndeterminate="True" Width="220" Height="4" />
-            <TextBlock Text="正在计算…" Foreground="{StaticResource Fg.Base}"
-                       HorizontalAlignment="Center" />
-          </StackPanel>
-        </Border>
+      <!-- 左下角：操作说明 -->
+      <Button HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="14"
+              Classes="help" Content="?"
+              Click="OnShowHelp"
+              ToolTip.Tip="查看操作说明" />
 
-        <!-- 空状态 -->
-        <Border IsVisible="{Binding !HasSvg}" Background="{StaticResource Bgc.Base}">
-          <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="9">
-            <TextBlock Text="输入母版，回车或点别处即自动渲染"
-                       Foreground="{StaticResource Fg.Muted}" FontSize="14"
-                       HorizontalAlignment="Center" />
-            <TextBlock Text="滚轮缩放 · 左键拖动 · 右键复位 · 双击 1:1"
-                       Foreground="{StaticResource Fg.Faint}" FontSize="11.5"
-                       HorizontalAlignment="Center" />
+      <!-- 右下角：画布方向。默认半透明不抢画面，悬停才实心。 -->
+      <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="14"
+              Classes="overlay" Padding="10,8">
+        <StackPanel Spacing="7">
+          <StackPanel Orientation="Horizontal" Spacing="0">
+            <Button Classes="dir" Content="↺" Click="OnRotateCcw"
+                    IsEnabled="{Binding !Busy}" ToolTip.Tip="逆时针旋转 90°" />
+            <Button Classes="dir" Content="↻" Click="OnRotateCw"
+                    IsEnabled="{Binding !Busy}" ToolTip.Tip="顺时针旋转 90°" />
+            <Button Classes="dir" Content="⇋" Click="OnMirrorX"
+                    IsEnabled="{Binding !Busy}" ToolTip.Tip="左右镜像" />
+            <Button Classes="dir" Content="⇅" Margin="0" Click="OnMirrorY"
+                    IsEnabled="{Binding !Busy}" ToolTip.Tip="上下镜像" />
           </StackPanel>
-        </Border>
-      </Grid>
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0" Text="{Binding XformDescription}"
+                       FontSize="10" Foreground="{StaticResource Fg.Faint}"
+                       VerticalAlignment="Center" Margin="2,0,10,0" />
+            <Button Grid.Column="1" Content="复位" FontSize="10.5" Padding="10,3"
+                    Click="OnResetXform" IsEnabled="{Binding CanResetXform}"
+                    ToolTip.Tip="恢复原始方向（清掉所有旋转与镜像）" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- 忙碌遮罩 -->
+      <Border IsVisible="{Binding Busy}" Background="{StaticResource Bgc.Scrim}">
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14">
+          <ProgressBar IsIndeterminate="True" Width="220" Height="4" />
+          <TextBlock Text="正在计算…" Foreground="{StaticResource Fg.Base}"
+                     HorizontalAlignment="Center" />
+        </StackPanel>
+      </Border>
+
+      <!-- 空状态 -->
+      <Border IsVisible="{Binding !HasSvg}" Background="{StaticResource Bgc.Base}">
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="9">
+          <TextBlock Text="输入母版，回车或点别处即自动渲染"
+                     Foreground="{StaticResource Fg.Muted}" FontSize="14"
+                     HorizontalAlignment="Center" />
+          <TextBlock Text="滚轮缩放 · 左键拖动 · 右键复位 · 双击 1:1 · 左下角 ? 看说明"
+                     Foreground="{StaticResource Fg.Faint}" FontSize="11.5"
+                     HorizontalAlignment="Center" />
+        </StackPanel>
+      </Border>
     </Grid>
   </DockPanel>
 </Window>

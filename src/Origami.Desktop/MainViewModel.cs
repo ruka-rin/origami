@@ -42,7 +42,7 @@ public sealed class ExportOptions
 
     /// <summary>建议文件名，把视图与配色都编码进去。</summary>
     public string FileName(ViewTab tab)
-        => $"{tab.Group}_{tab.Name}_"
+        => $"{tab.Shape switch { ShapeKind.Strip => "长条", _ => "方形" }}_{tab.Name}_"
          + (tab.SupportsColor ? (Color == ColorMode.Peaks ? "彩色" : "黑白") : "分解")
          + "." + Extension;
 }
@@ -62,11 +62,11 @@ public sealed class MainViewModel : Observable
     public MainViewModel()
     {
         foreach (var v in Views.All)
-            ViewTabs.Add(new ViewTab(v.Group, v.Name, v.Kind, v.Hint, v.Fit));
+            ViewTabs.Add(new ViewTab(v.Shape, v.Content));
 
         MasterText = InitialMaster;
         _color = ColorMode.Peaks;
-        SelectedTab = ViewTabs[0];
+        SelectedTab = ViewTabs[0];      // 长条·折痕图
         CanColorize = SelectedTab.SupportsColor;
     }
 
@@ -212,11 +212,71 @@ public sealed class MainViewModel : Observable
     }
 
     ViewTab? _selectedTab;
-    /// <summary>当前选中的视图标签页。</summary>
+    /// <summary>当前视图（形状 × 内容 解析出的唯一组合）。</summary>
     public ViewTab? SelectedTab
     {
         get => _selectedTab;
-        set => Set(ref _selectedTab, value);
+        private set => Set(ref _selectedTab, value);
+    }
+
+    // ---------------------------------------------------------------- 视图维度
+    //
+    // 6 种视图 = 2 形状 × 3 内容。界面把它们拆成两组单选（画布左上角、右上角），
+    // 而不是 6 个标签 —— 后者会让侧栏变长，且两组的正交关系被压平了。
+
+    ShapeKind _shape = ShapeKind.Strip;
+
+    /// <summary>纸面形状：长条 / 方形。切换后重渲当前内容。</summary>
+    public ShapeKind Shape
+    {
+        get => _shape;
+        set
+        {
+            if (!Set(ref _shape, value)) return;
+            SelectView(ViewInfo_Of(value, _content));
+        }
+    }
+
+    ContentKind _content = ContentKind.Crease;
+
+    /// <summary>图面内容：折痕图 / 成品 / 原子片。切换后重渲当前形状。</summary>
+    public ContentKind Content
+    {
+        get => _content;
+        set
+        {
+            if (!Set(ref _content, value)) return;
+            SelectView(ViewInfo_Of(_shape, value));
+        }
+    }
+
+    static ViewInfo ViewInfo_Of(ShapeKind s, ContentKind c) => Views.Resolve(s, c);
+
+    ViewTab SlotOf(ShapeKind s, ContentKind c)
+    {
+        var t = ViewTabs.FirstOrDefault(v => v.Shape == s && v.Content == c);
+        if (t is not null) return t;
+        t = new ViewTab(s, c);
+        ViewTabs.Add(t);
+        return t;
+    }
+
+    /// <summary>切到指定视图。渲染是异步的，这里不阻塞调用方（界面不该被卡住）。</summary>
+    void SelectView(ViewInfo info)
+    {
+        var tab = SlotOf(info.Shape, info.Content);
+        _ = SelectViewAsync(tab);
+    }
+
+    /// <summary>把形状与内容切换到某个既有视图（导入后用）。</summary>
+    public void SelectView(ViewKind kind)
+    {
+        var v = Views.All.First(x => x.Kind == kind);
+        _shape = v.Shape;
+        _content = v.Content;
+        RaisePropertyChanged(nameof(Shape));
+        RaisePropertyChanged(nameof(Content));
+        SelectView(v);
     }
 
     // ---------------------------------------------------------------- 上色
@@ -356,9 +416,8 @@ public sealed class MainViewModel : Observable
             MasterText = r.MasterText;
             Color = r.Color;                 // 文件是黑白就自动把开关关掉
 
-            // 导入了什么就先看什么
-            if (ViewTabs.FirstOrDefault(t => t.Kind == r.PreferredView) is { } want)
-                SelectedTab = want;
+            // 导入了什么就先看什么（切形状 + 内容两个维度）
+            SelectView(r.PreferredView);
             ViewerFit?.Invoke(SelectedTab);
 
             // 必须调 RenderCurrentAsync：RebuildAsync 的 `if (Busy) return` 会挡掉它
@@ -429,12 +488,13 @@ public sealed class MainViewModel : Observable
         finally { Busy = false; }
     }
 
-    /// <summary>切换视图标签页（命中缓存则直接显示）。</summary>
+    /// <summary>切换视图（命中缓存则直接显示）。</summary>
     public async Task SelectViewAsync(ViewTab tab)
     {
         if (tab is null) return;
         if (_doc is null) { Status = "请先解析母版"; return; }
 
+        SelectedTab = tab;
         // 原子片分解本来每面一色，上色开关对它无意义
         CanColorize = tab.SupportsColor;
 
@@ -446,11 +506,11 @@ public sealed class MainViewModel : Observable
             return;
         }
 
-        // 侧栏在 Busy 期间仍可点，连点两个未缓存视图会并发构建，
+        // 视图切换在 Busy 期间仍可点，连点两个未缓存视图会并发构建，
         // 用递增序号保证「只有最后一次点击的结果能落地」。
         int seq = ++_viewSeq;
         Busy = true;
-        Status = $"正在构建 {tab.Group}·{tab.Name}…";
+        Status = $"正在构建 {tab.Title}…";
         try
         {
             var svg = await Task.Run(() => Views.BuildSvg(_doc, tab.Kind, Color, Xform));
@@ -562,21 +622,23 @@ public sealed class MainViewModel : Observable
     }
 }
 
-/// <summary>一个视图标签页。</summary>
-public sealed class ViewTab(string group, string name, ViewKind kind, string hint, FitMode fit)
-    : Observable
+/// <summary>
+/// 一个视图缓存槽。形状与内容两个维度解析出唯一的 <see cref="ViewInfo"/>，
+/// 槽本身负责记住该视图已构建的 SVG，避免切回来时重跑折叠。
+/// </summary>
+public sealed class ViewTab(ShapeKind shape, ContentKind content) : Observable
 {
-    public string Group { get; } = group;
-    public string Name { get; } = name;
-    public ViewKind Kind { get; } = kind;
-    public string Hint { get; } = hint;
+    public ShapeKind Shape { get; } = shape;
+    public ContentKind Content { get; } = content;
 
-    /// <summary>切到这个视图时的默认取景方式。</summary>
-    public FitMode Fit { get; } = fit;
+    public ViewInfo Info => Views.Resolve(Shape, Content);
+    public ViewKind Kind => Info.Kind;
+    public string Name => Info.Name;
+    public string Hint => Info.Hint;
+    public FitMode Fit => Info.Fit;
 
     /// <summary>这个视图能不能上色（原子片分解本来就每面一色，不受开关影响）。</summary>
-    public bool SupportsColor
-        => Kind is not (ViewKind.StripPieces or ViewKind.SquarePieces);
+    public bool SupportsColor => Info.SupportsColor;
 
     string? _cached;
     /// <summary>该视图已构建的 SVG 文本（缓存，避免重复构建）。</summary>
@@ -587,5 +649,5 @@ public sealed class ViewTab(string group, string name, ViewKind kind, string hin
     }
 
     /// <summary>标签文字：「长条 · 折痕图」。</summary>
-    public string Title => $"{Group} · {Name}";
+    public string Title => $"{Shape switch { ShapeKind.Strip => "长条", _ => "方形" }} · {Name}";
 }

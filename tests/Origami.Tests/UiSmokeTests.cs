@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+
 using Origami.Desktop;
 using Xunit;
 
@@ -56,6 +57,87 @@ public class UiSmokeTests
         Assert.Equal("导出", dlg.Title);
         dlg.Close();
     }
+
+    [AvaloniaFact]
+    public void 帮助对话框能加载()
+    {
+        var dlg = new HelpDialog();
+        dlg.Show();
+        Assert.Equal("操作说明", dlg.Title);
+        dlg.Close();
+    }
+
+    /// <summary>
+    /// 导出对话框的格式与配色必须能来回切换。
+    /// <para>
+    /// 曾经的实现是「Border 画卡片+ 透明 RadioButton 叠放」，透明层
+    /// <c>IsHitTestVisible=False</c> 导致<b>点已选中项也切不动</b>、两项不互斥。
+    /// 根因是交互被转移到了 Border 上，RadioButton 本身不再是可点击的控件。</para>
+    /// <para>
+    /// 这里断言的是<b>结构前提</b>：四个选项都必须是启用且可见的 RadioButton，
+    /// 由RadioButton 自己承担交互（配GroupName 做互斥）。
+    /// <para>
+    /// 互斥行为本身<b>无法在无头环境断言</b> —— 实测 Avalonia 无头平台的
+    /// GroupName 分组完全不响应指针事件（连首次点击都不生效），
+    /// 这是平台限制而非控件问题，需要真机交互验证。
+    /// </para>
+    /// </summary>
+    [AvaloniaFact]
+    public void 导出选项由RadioButton承载交互()
+    {
+        var vm = new MainViewModel();
+        var dlg = new ExportDialog(vm.ViewTabs[0], ColorMode.Peaks, new Size(1200, 1200));
+        dlg.Show();
+
+        // 四个选项都必须可交互：被禁用/隐藏就退回到「点不动」的旧问题
+        foreach (var r in new[] { dlg.SvgRadio, dlg.PngRadio, dlg.ColorRadio, dlg.PlainRadio })
+        {
+            Assert.True(r.IsEnabled, "选项被禁用了，用户无法点击");
+            Assert.Same(r.Classes.Contains("disabled") ? null : r, r);   // 未标记为 disabled
+        }
+
+        // GroupName 是互斥的前提，两个组必须各自齐备
+        Assert.Equal("fmt", dlg.SvgRadio.GroupName);
+        Assert.Equal("fmt", dlg.PngRadio.GroupName);
+        Assert.Equal("clr", dlg.ColorRadio.GroupName);
+        Assert.Equal("clr", dlg.PlainRadio.GroupName);
+
+        // 默认 PNG，且仅 PNG 时显示分辨率
+        Assert.True(dlg.PngRadio.IsChecked);
+        Assert.True(dlg.ScalePanel.IsVisible);
+
+        dlg.Close();
+    }
+
+    /// <summary>切到 SVG 时分辨率区块应隐藏、说明文字应显示。</summary>
+    [AvaloniaFact]
+    public void 导出格式切换控制分辨率可见性()
+    {
+        var vm = new MainViewModel();
+        var dlg = new ExportDialog(vm.ViewTabs[0], ColorMode.Peaks, new Size(1200, 1200));
+        dlg.Show();
+
+        dlg.SvgRadio.IsChecked = true;
+        Assert.False(dlg.ScalePanel.IsVisible);
+        Assert.True(dlg.VectorNote.IsVisible);
+
+        dlg.Close();
+    }
+
+    /// <summary>配色两项同属一组。</summary>
+    [AvaloniaFact]
+    public void 导出配色同组互斥()
+    {
+        var vm = new MainViewModel();
+        var dlg = new ExportDialog(vm.ViewTabs[0], ColorMode.Peaks, new Size(1200, 1200));
+        dlg.Show();
+
+        Assert.True(dlg.ColorRadio.IsChecked);
+        Assert.Equal(dlg.ColorRadio.GroupName, dlg.PlainRadio.GroupName);
+        Assert.NotEqual(dlg.SvgRadio.GroupName, dlg.ColorRadio.GroupName);   // 两组互不影响
+
+        dlg.Close();
+    }
 }
 
 /// <summary>
@@ -82,12 +164,45 @@ public class ViewModelTests
         var vm = new MainViewModel();
         await vm.RebuildAsync();
 
-        foreach (var tab in vm.ViewTabs)
+        // 2 形状 × 3 内容 = 6 种组合，逐一切过去都必须能产出图
+        foreach (var shape in new[] { ShapeKind.Strip, ShapeKind.Square })
         {
-            vm.SelectedTab = tab;
-            await vm.SelectViewAsync(tab);
-            Assert.False(string.IsNullOrEmpty(vm.SvgSource), $"{tab.Title} 没有产出 SVG");
+            foreach (var content in new[] { ContentKind.Crease, ContentKind.Folded, ContentKind.Pieces })
+            {
+                vm.Shape = shape;
+                vm.Content = content;
+                await Settle(vm);
+                Assert.False(string.IsNullOrEmpty(vm.SvgSource), $"{shape}/{content} 没有产出 SVG");
+            }
         }
+    }
+
+    /// <summary>形状维度只切形状、内容维度只切内容，当前视图应始终与两者一致。</summary>
+    [AvaloniaFact]
+    public async Task 维度组合解析出正确视图()
+    {
+        var vm = new MainViewModel();
+        await vm.RebuildAsync();
+
+        vm.Shape = ShapeKind.Square;
+        vm.Content = ContentKind.Folded;
+        await Settle(vm);
+
+        Assert.Equal(ShapeKind.Square, vm.SelectedTab!.Shape);
+        Assert.Equal(ContentKind.Folded, vm.SelectedTab.Content);
+        Assert.Equal(ViewKind.SquareFolded, vm.SelectedTab.Kind);
+    }
+
+    /// <summary>六种组合都能被解析到，且互不重复。</summary>
+    [Fact]
+    public void 六种组合无重复()
+    {
+        var all = new List<ViewKind>();
+        foreach (var s in new[] { ShapeKind.Strip, ShapeKind.Square })
+            foreach (var c in new[] { ContentKind.Crease, ContentKind.Folded, ContentKind.Pieces })
+                all.Add(Views.Resolve(s, c).Kind);
+
+        Assert.Equal(6, all.Distinct().Count());
     }
 
     /// <summary>旋转后「恢复原始方向」必须可用，复位后必须禁用。</summary>
@@ -136,14 +251,13 @@ public class ViewModelTests
         var vm = new MainViewModel();
         await vm.RebuildAsync();
 
-        var pieces = vm.ViewTabs.First(t => !t.SupportsColor);
-        vm.SelectedTab = pieces;
-        await vm.SelectViewAsync(pieces);
+        // 原子片不支持上色
+        vm.Content = ContentKind.Pieces;
+        await Settle(vm);
         Assert.False(vm.CanColorize);
 
-        var crease = vm.ViewTabs.First(t => t.SupportsColor);
-        vm.SelectedTab = crease;
-        await vm.SelectViewAsync(crease);
+        vm.Content = ContentKind.Crease;
+        await Settle(vm);
         Assert.True(vm.CanColorize);
     }
 
@@ -182,9 +296,8 @@ public class ViewModelTests
         await vm.RebuildAsync();
 
         var tab = vm.ViewTabs.First(t => t.Kind == ViewKind.Strip);
-        vm.SelectedTab = tab;
         vm.IsColorOn = true;
-        await vm.SelectViewAsync(tab);
+        await Settle(vm);
 
         // 画布是彩色，但导出选黑白 —— 结果必须是黑白
         var (plainBytes, ext) = vm.Export(tab, new ExportOptions
@@ -217,8 +330,7 @@ public class ViewModelTests
         await vm.RebuildAsync();
 
         var tab = vm.ViewTabs.First(t => t.Kind == ViewKind.Strip);
-        vm.SelectedTab = tab;
-        await vm.SelectViewAsync(tab);
+        await Settle(vm);
 
         var (small, _) = vm.Export(tab, new ExportOptions
         {

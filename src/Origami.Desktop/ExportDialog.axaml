@@ -9,31 +9,8 @@
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource Bgc.Chrome}">
 
-  <Window.Styles>
-    <!-- 选项做成整行可点的卡片，比裸RadioButton 的圆点+文字更易点 -->
-    <Style Selector="Border.choice">
-      <Setter Property="CornerRadius" Value="{StaticResource Rounded.Control}" />
-      <Setter Property="Padding" Value="12,9" />
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-    </Style>
-    <Style Selector="Border.choice:pointerover">
-      <Setter Property="Background" Value="{StaticResource Bgc.Hover}" />
-    </Style>
-    <Style Selector="Border.choice.on">
-      <Setter Property="Background" Value="{StaticResource Accent.Soft}" />
-      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
-    </Style>
-    <!-- 不可用时文字退到最弱一级，与整体禁用态一致 -->
-    <Style Selector="TextBlock.disabled">
-      <Setter Property="Foreground" Value="{StaticResource Fg.Faint}" />
-    </Style>
-  </Window.Styles>
-
-  <Grid Margin="22" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+  <Grid Margin="22" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
     <Grid.RowDefinitions>
-      <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
@@ -49,39 +26,24 @@
     <!-- 格式 -->
     <StackPanel Grid.Row="1" Margin="0,20,0,0" Spacing="0">
       <TextBlock Classes="section" Text="格式" />
+      <!-- 两项必须在<b>同一个父容器</b>里：GroupName 的互斥是按「同组+ 同父级」
+           查找兄弟的，分到两个 Grid 里就找不到彼此，于是互斥失效。 -->
       <Grid ColumnDefinitions="*,*">
-        <Border x:Name="SvgChoice" Grid.Column="0" Classes="choice" Margin="0,0,6,0"
-                PointerPressed="OnPickSvg">
-          <TextBlock Text="SVG 矢量" FontSize="12" Foreground="{StaticResource Fg.Base}" />
-        </Border>
-        <RadioButton x:Name="SvgRadio" Grid.Column="0" IsHitTestVisible="False"
-                     Opacity="0" MinWidth="0" />
-        <Border x:Name="PngChoice" Grid.Column="1" Classes="choice" Margin="6,0,0,0"
-                PointerPressed="OnPickPng">
-          <TextBlock Text="PNG 位图" FontSize="12" Foreground="{StaticResource Fg.Base}" />
-        </Border>
-        <RadioButton x:Name="PngRadio" Grid.Column="1" IsHitTestVisible="False"
-                     Opacity="0" MinWidth="0" />
+        <RadioButton x:Name="SvgRadio" Grid.Column="0" GroupName="fmt"
+                     Theme="{StaticResource SegmentOption}" Margin="0,0,6,0" Content="SVG 矢量" />
+        <RadioButton x:Name="PngRadio" Grid.Column="1" GroupName="fmt"
+                     Theme="{StaticResource SegmentOption}" Margin="6,0,0,0" Content="PNG 位图" />
       </Grid>
     </StackPanel>
 
     <!-- 配色 -->
-    <StackPanel Grid.Row="2" Margin="0,18,0,0">
+    <StackPanel Grid.Row="2" Margin="0,18,0,0" Spacing="0">
       <TextBlock Classes="section" Text="配色" />
       <Grid ColumnDefinitions="*,*">
-        <Border x:Name="ColorChoice" Grid.Column="0" Classes="choice" Margin="0,0,6,0"
-                PointerPressed="OnPickColor">
-          <TextBlock Text="彩色" FontSize="12" Foreground="{StaticResource Fg.Base}" />
-        </Border>
-        <RadioButton x:Name="ColorRadio" Grid.Column="0" IsHitTestVisible="False"
-                     Opacity="0" MinWidth="0" />
-        <Border x:Name="PlainChoice" Grid.Column="1" Classes="choice" Margin="6,0,0,0"
-                PointerPressed="OnPickPlain">
-          <TextBlock x:Name="PlainLabel" Text="黑白 / 剪影" FontSize="12"
-                     Foreground="{StaticResource Fg.Base}" />
-        </Border>
-        <RadioButton x:Name="PlainRadio" Grid.Column="1" IsHitTestVisible="False"
-                     Opacity="0" MinWidth="0" />
+        <RadioButton x:Name="ColorRadio" Grid.Column="0" GroupName="clr"
+                     Theme="{StaticResource SegmentOption}" Margin="0,0,6,0" Content="彩色" />
+        <RadioButton x:Name="PlainRadio" Grid.Column="1" GroupName="clr"
+                     Theme="{StaticResource SegmentOption}" Margin="6,0,0,0" Content="黑白 / 剪影" />
       </Grid>
     </StackPanel>
 
@@ -103,8 +65,7 @@
 
     <Rectangle Grid.Row="5" Classes="hairline" Margin="0,20,0,0" />
 
-    <StackPanel Grid.Row="6" />
-    <StackPanel Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right"
+    <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right"
                 Margin="0,16,0,0" Spacing="8">
       <Button Content="取消" MinWidth="92" Click="OnCancel" />
       <Button Content="导出" MinWidth="92" Click="OnExport" IsDefault="True" />

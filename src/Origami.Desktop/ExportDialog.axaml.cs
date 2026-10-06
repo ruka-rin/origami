@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Interactivity;
 using Origami.Core;
 
@@ -30,6 +29,8 @@ public partial class ExportDialog : Window
 
     public ExportDialog(ViewTab? tab, ColorMode currentColor, Size baseSize)
     {
+        // 不要自己写 InitializeComponent() —— XAML 编译器生成的同名方法还负责
+        // 把 x:Name 声明的控件字段赋值上，手写会覆盖掉它
         InitializeComponent();
 
         _tab = tab;
@@ -44,9 +45,8 @@ public partial class ExportDialog : Window
 
         // 原子片分解本来每面一色，配色选项对它无意义
         bool canColor = tab?.SupportsColor ?? true;
-        ColorChoice.IsEnabled = canColor;
-        PlainChoice.IsEnabled = canColor;
-        PlainLabel.Classes.Set("disabled", !canColor);
+        ColorRadio.IsEnabled = canColor;
+        PlainRadio.IsEnabled = canColor;
         if (!canColor)
         {
             ColorRadio.IsChecked = true;          // 只是让取值合法
@@ -58,42 +58,40 @@ public partial class ExportDialog : Window
         PlainRadio.IsCheckedChanged += (_, _) => SyncFormat();
 
         // 在代码里订阅而不是写在 XAML 上：SelectedIndex="1" 会在
-        // InitializeComponent() 期间就触发 SelectionChanged，那时 _baseSize 还没赋值。
+        // InitializeComponent() 期间就触发 SelectionChanged，那时 _baseSize 还没赋值
         ScaleBox.SelectionChanged += (_, _) => UpdateSizeHint();
 
         SyncFormat();
         UpdateSizeHint();
     }
 
-    // ---------------------------------------------------------------- 选项卡片
-
-    void OnPickSvg(object? sender, PointerPressedEventArgs e) => SvgRadio.IsChecked = true;
-
-    void OnPickPng(object? sender, PointerPressedEventArgs e) => PngRadio.IsChecked = true;
-
-    void OnPickColor(object? sender, PointerPressedEventArgs e) => ColorRadio.IsChecked = true;
-
-    void OnPickPlain(object? sender, PointerPressedEventArgs e) => PlainRadio.IsChecked = true;
-
-    /// <summary>把 RadioButton 的选中态同步到卡片的视觉态，并按格式切换可见区块。</summary>
+    /// <summary>
+    /// 按所选格式切换「分辨率」与「无分辨率」的说明区块。
+    /// <para>
+    /// 判据用「SVG 被选中则无分辨率」而非「PNG 是否选中」——
+    /// 两项同时为 true 时（初始化阶段、或分组未生效的环境）后者会误判成 PNG。
+    /// SVG 是明确的一端，用它更稳。
+    /// </para>
+    /// </summary>
     void SyncFormat()
     {
-        bool png = PngRadio.IsChecked == true;
+        bool svg = SvgRadio.IsChecked == true;
 
-        SetActive(SvgChoice, SvgRadio.IsChecked == true);
-        SetActive(PngChoice, png);
-        SetActive(ColorChoice, ColorRadio.IsChecked == true);
-        SetActive(PlainChoice, PlainRadio.IsChecked == true);
-
-        ScalePanel.IsVisible = png;
-        VectorNote.IsVisible = !png;
+        ScalePanel.IsVisible = !svg;
+        VectorNote.IsVisible = svg;
     }
 
-    static void SetActive(Border card, bool on)
-        => card.Classes.Set("on", on);
-
     ColorMode ChosenColor
-        => ColorRadio.IsChecked == true ? ColorMode.Peaks : ColorMode.Plain;
+    {
+        get
+        {
+            // 两项都未选中时退回当前画布的配色，而不是默认彩色：
+            // 原子片分解不支持配色，此项由 CurrentColor 占位。
+            if (ColorRadio.IsChecked == true) return ColorMode.Peaks;
+            if (PlainRadio.IsChecked == true) return ColorMode.Plain;
+            return _currentColor;
+        }
+    }
 
     /// <summary>
     /// 直接给出<b>导出后的实际像素尺寸</b>，而不是含糊的倍数描述 ——
@@ -115,23 +113,21 @@ public partial class ExportDialog : Window
             : $"输出 {w} × {h} 像素。";
     }
 
-    /// <summary>用户确认后得到的选项；取消则为 null。</summary>
-    public ExportOptions? Result { get; private set; }
-
     void OnExport(object? sender, RoutedEventArgs e)
     {
         double scale = 2.0;
         if (ScaleBox.SelectedItem is ComboBoxItem { Tag: var tag })
             double.TryParse(tag?.ToString(), out scale);
 
-        Result = new ExportOptions
+        var result = new ExportOptions
         {
-            Format = PngRadio.IsChecked == true ? ExportFormat.Png : ExportFormat.Svg,
+            // 与 SyncFormat 保持同一判据：SVG 选中就是 SVG，否则 PNG
+            Format = SvgRadio.IsChecked == true ? ExportFormat.Svg : ExportFormat.Png,
             // 原子片分解不支持配色，用当前值占位即可（渲染时不会读它）
             Color = _tab?.SupportsColor != false ? ChosenColor : _currentColor,
             PngScale = scale,
         };
-        Close(Result);
+        Close(result);
     }
 
     void OnCancel(object? sender, RoutedEventArgs e) => Close(null);

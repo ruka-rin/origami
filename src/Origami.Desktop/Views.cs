@@ -11,11 +11,31 @@ public enum FitMode
     Width,
 }
 
-/// <summary>一个可显示的视图种类。</summary>
+/// <summary>纸面形状维度。</summary>
+public enum ShapeKind
+{
+    /// <summary>长条 —— 母版原样的一长条。</summary>
+    Strip,
+    /// <summary>方形 —— 铺排成方形后的 CP。</summary>
+    Square,
+}
+
+/// <summary>图面内容维度。</summary>
+public enum ContentKind
+{
+    /// <summary>折痕图。</summary>
+    Crease,
+    /// <summary>折叠成品。</summary>
+    Folded,
+    /// <summary>原子片分解（每面一色，检查层序与漏面）。</summary>
+    Pieces,
+}
+
+/// <summary>一个可显示的视图种类：形状 × 内容，共 6 种。</summary>
 /// <para>
 /// 「黑白 vs 彩色」「渲染 vs 剪影」<b>不是独立视图</b>，而是同一张图的
-/// <see cref="ViewInfo.ColorModes"/> 属性 —— 由界面上的一个「上色」开关切换。
-/// 拆成 9 个视图只会让侧栏变成两倍长，而这两组之间没有任何其它差异。
+/// 配色属性 —— 由界面上的「上色」开关切换。把它拆成独立维度会让切换项翻倍，
+/// 而这两组之间没有任何其它差异。
 /// </para>
 public enum ViewKind
 {
@@ -36,29 +56,33 @@ public enum ColorMode
     Peaks,
 }
 
-/// <summary>视图的元信息（用于侧栏与状态栏）。</summary>
+/// <summary>视图的元信息：形状 × 内容 = 一种视图。</summary>
 /// <param name="Fit">
 /// 默认取景。长条折痕图是 100 格 × 1 格（宽高比 100:1），用「适应窗口」会把每格
-/// 压到几个像素，等于什么都看清，所以单独用「铺满宽度」。</param>
-public sealed record ViewInfo(ViewKind Kind, string Group, string Name, string Hint,
-                             FitMode Fit = FitMode.Window)
+/// 压到几个像素，等于什么都看不清，所以单独用「铺满宽度」。</param>
+public sealed record ViewInfo(ViewKind Kind, ShapeKind Shape, ContentKind Content,
+                             string Name, string Hint, FitMode Fit = FitMode.Window)
 {
     /// <summary>这个视图能不能上色（原子片分解本来就每面一色，不需要开关）。</summary>
-    public bool SupportsColor
-        => Kind is not (ViewKind.StripPieces or ViewKind.SquarePieces);
+    public bool SupportsColor => Content != ContentKind.Pieces;
 }
 
 public static class Views
 {
     public static readonly ViewInfo[] All =
     {
-        new(ViewKind.Strip,        "长条",   "折痕图", "母版原样：一长条折痕", FitMode.Width),
-        new(ViewKind.StripFolded,  "长条成品", "成品", "顺次滚动折叠的结果"),
-        new(ViewKind.Square,       "方形",   "折痕图", "铺排成方形后的 CP"),
-        new(ViewKind.SquareFolded, "方形成品", "成品", "树反射折叠，拼出字母"),
-        new(ViewKind.StripPieces,   "检查",   "长条原子片", "顺次折叠每面一色，查漏面/重叠"),
-        new(ViewKind.SquarePieces,  "检查",   "方形原子片", "树反射每面一色，查漏面/重叠"),
+        new(ViewKind.Strip,        ShapeKind.Strip,  ContentKind.Crease,  "折痕图", "母版原样：一长条折痕", FitMode.Width),
+        new(ViewKind.StripFolded,  ShapeKind.Strip,  ContentKind.Folded,  "成品",   "顺次滚动折叠的结果"),
+        new(ViewKind.StripPieces,  ShapeKind.Strip,  ContentKind.Pieces,  "原子片", "顺次折叠每面一色，查漏面/重叠"),
+
+        new(ViewKind.Square,       ShapeKind.Square, ContentKind.Crease,  "折痕图", "铺排成方形后的 CP"),
+        new(ViewKind.SquareFolded, ShapeKind.Square, ContentKind.Folded,  "成品",   "树反射折叠，拼出字母"),
+        new(ViewKind.SquarePieces, ShapeKind.Square, ContentKind.Pieces,  "原子片", "树反射每面一色，查漏面/重叠"),
     };
+
+    /// <summary>由形状与内容两个维度解析出唯一视图。</summary>
+    public static ViewInfo Resolve(ShapeKind shape, ContentKind content)
+        => All.First(v => v.Shape == shape && v.Content == content);
 
     /// <summary>
     /// 由母版产出全流程的中间结果。<b>只算一次</b>，所有视图从这里取 —— 否则每切一次
