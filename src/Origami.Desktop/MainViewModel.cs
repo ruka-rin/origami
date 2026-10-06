@@ -78,14 +78,30 @@ public sealed class MainViewModel : Observable
     public string MasterText
     {
         get => _masterText;
-        set => Set(ref _masterText, value);
+        set
+        {
+            if (!Set(ref _masterText, value)) return;
+
+            // 手改母版后，字模带来的旋转次数不再对应新内容 -> 作废，
+            // 让折叠层退回按 bbox 猜（否则会把旧朝向硬套到新母版上）
+            if (value != _masterRotateSource) _masterRotate = 0;
+        }
     }
+
+    /// <summary>生成母版时写入，用来识别「用户是否手改过母版」。</summary>
+    string _masterRotateSource = "";
 
     Views.Document? _doc;
     /// <summary>当前母版对应的全流程结果；解析失败时为 null。</summary>
     public Views.Document? Document => _doc;
 
     // ---------------------------------------------------------------- 文本输入框
+
+    /// <summary>
+    /// 当前母版对应的成品旋转次数（0..3），来自字模编码。
+    /// 用户<b>手动改母版串</b>后它就不再可信 -> 置回 0 让折叠层退回按 bbox 猜。
+    /// </summary>
+    int _masterRotate;
 
     string _textInput = "";
     /// <summary>
@@ -162,10 +178,10 @@ public sealed class MainViewModel : Observable
         // 使更早的生成请求作废（哪怕它还在后台跑）
         int seq = ++_genSeq;
 
-        string master;
+        string master; int rotate;
         try
         {
-            master = await Task.Run(() => Origami.Core.FoldFont.TextToMaster(raw));
+            (master, rotate) = await Task.Run(() => Origami.Core.FoldFont.TextToMasterWithRotate(raw));
         }
         catch (Exception e)
         {
@@ -181,6 +197,10 @@ public sealed class MainViewModel : Observable
             return;
         }
 
+        // 先记下这次的母版与旋转，再赋值 —— MasterText 的 setter 会比对
+        // _masterRotateSource，手改时作废 rotate
+        _masterRotateSource = master;
+        _masterRotate = rotate;
         MasterText = master;
         await RenderCurrentAsync("正在生成并渲染…");
     }
@@ -509,6 +529,7 @@ public sealed class MainViewModel : Observable
 
         // 渲染序号：母版又变了就作废本次结果，避免慢的旧结果覆盖新内容
         int seq = ++_renderSeq;
+        int rot = _masterRotate;
 
         Busy = true;
         Status = busyStatus;
@@ -517,7 +538,7 @@ public sealed class MainViewModel : Observable
             // 铺排 + 折叠是 CPU 密集的，跑在后台以免冻结界面
             var work = await Task.Run(() =>
             {
-                var doc = Views.Build(raw);
+                var doc = Views.Build(raw, rot);
                 return (Doc: doc, Svg: Views.BuildSvg(doc, tab.Kind, Color, Xform));
             });
 

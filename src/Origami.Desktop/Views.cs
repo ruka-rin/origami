@@ -109,9 +109,14 @@ public static class Views
     /// 顺次滚动（长条母版的意图）与树反射（KRENIO / PROTEIN 拼出字母的那条路）。
     /// </para>
     /// </summary>
-    public static Document Build(string masterText)
+    /// <param name="rotate">
+    /// 成品该转多少个 90°（来自字模编码的 <c>@</c> 计数，由第一个字母决定）。
+    /// 传0 表示信息未知，<see cref="FoldOps.FoldStrip"/> 会退回按 bbox 猜朝向。
+    /// </param>
+    public static Document Build(string masterText, int rotate = 0)
     {
         var master = Master.ParseMaster(masterText);
+        master.Rotate = rotate;
         var strip = Model.StripModel(master);
         var plan = SquareOps.PlanFromMaster(master);
         var square = Model.SquareModel(plan);

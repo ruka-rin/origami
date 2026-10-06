@@ -399,6 +399,47 @@ public class FoldTests
         }
     }
 
+    /// <summary>
+    /// 成品旋转次数由<b>第一个字母</b>决定（旧实现的 rotate 约定）。
+    /// <para>
+    /// 旧实现靠编码里的<c>@</c> 计数「一次到位」地摆正成品：
+    /// <c>for (l = 0; l &lt; letter.rotate; ++l) polygon = rotatePolygon(polygon);</c>
+    /// 它是整段编码的属性，而首字符用 start 变体、旋转标记就写在那里。
+    /// </para>
+    /// </summary>
+    [Theory]
+    // rotate=0：ABDEFGHIKMNPR T X Y Z
+    [InlineData("A", 0)] [InlineData("B", 0)] [InlineData("K", 0)]
+    [InlineData("Z", 0)] [InlineData("M", 0)] [InlineData("X", 0)]
+    // rotate=1：6 8 J L O Q U V W
+    [InlineData("O", 1)] [InlineData("L", 1)] [InlineData("U", 1)]
+    [InlineData("W", 1)] [InlineData("6", 1)] [InlineData("8", 1)]
+    // rotate=2：1 2 5
+    [InlineData("1", 2)] [InlineData("2", 2)] [InlineData("5", 2)]
+    // rotate=3：0 C S
+    [InlineData("0", 3)] [InlineData("C", 3)] [InlineData("S", 3)]
+    public void 成品旋转次数由首字母决定(string first, int expectRotate)
+    {
+        var (master, rotate) = FoldFont.TextToMasterWithRotate(first);
+        Assert.NotEqual("", master);
+        Assert.Equal(expectRotate, rotate);
+    }
+
+    /// <summary>多字符时仍以<b>首字母</b>为准 —— 后续字母的 rotate 不参与。</summary>
+    [Theory]
+    [InlineData("OA", 1)]   // O=1，A=0
+    [InlineData("AO", 0)]   // A=0，O=1 被忽略
+    [InlineData("1A", 2)]   // 1=2
+    [InlineData("C0", 3)]   // C=3
+    [InlineData("OO", 1)]
+    [InlineData("00", 3)]
+    public void 多字符只看首字母的旋转次数(string text, int expectRotate)
+    {
+        var (master, rotate) = FoldFont.TextToMasterWithRotate(text);
+        Assert.NotEqual("", master);
+        Assert.Equal(expectRotate, rotate);
+    }
+
 
     [Fact]
     public void 方形对偶图必须是树()

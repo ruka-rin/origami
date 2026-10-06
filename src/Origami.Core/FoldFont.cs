@@ -139,11 +139,22 @@ public static class FoldFont
     /// 否则每行首字符用「词首」变体，起始折痕由字模自带。
     /// </param>
     public static string TextToMaster(string text, bool mirror = false, bool left = false)
+        => TextToMasterWithRotate(text, mirror, left).Master;
+
+    /// <summary>
+    /// 文本 -&gt; 母版，<b>并给出成品该转多少个 90°</b>。
+    /// <para>
+    /// <paramref name="Rotate"/> 即字模编码里的 <c>@</c> 计数，由第一个字母决定
+    /// ——旧实现用它「一次到位」地摆正成品，不靠 bbox 猜朝向。
+    /// </para>
+    /// </summary>
+    public static (string Master, int Rotate) TextToMasterWithRotate(
+        string text, bool mirror = false, bool left = false)
     {
         var lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n').ToList();
         while (lines.Count > 0 && lines[0].Length == 0) lines.RemoveAt(0);
         while (lines.Count > 0 && lines[^1].Length == 0) lines.RemoveAt(lines.Count - 1);
-        if (lines.Count == 0) return "";
+        if (lines.Count == 0) return ("", 0);
 
         int parity = left ? 1 : 0;
         var sb = new System.Text.StringBuilder();
@@ -195,7 +206,8 @@ public static class FoldFont
                 enc = enc[..(idx + 1)] + (mirror ? "" : "#") + "|" + enc[(idx + 1)..];
         }
 
-        return CreasesToMaster(ParseEnc(enc, false).Creases);
+        var parsed = ParseEnc(enc, false);
+        return (CreasesToMaster(parsed.Creases), parsed.Rotate);
     }
 
     /// <summary>字模编码开头的 <c>_</c> / 空格是「对齐余量」，不计入折叠。</summary>

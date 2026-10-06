@@ -24,6 +24,24 @@ public sealed class Master
     public List<int> Pipes { get; }
     public HashSet<int> PipeSet { get; }
 
+    /// <summary>
+    /// 成品该转多少个 90° 才摆正（0..3）。
+    /// <para>
+    /// 来自字模编码里的 <c>@</c> 标记 —— <see cref="FoldFont.ParseEnc"/> 统计
+    /// 第一个 <c>~</c> 之后的 <c>@</c> 个数。它是<b>整段编码</b>的属性，
+    /// 实际由<b>第一个字母</b>决定（首字符用 start 变体，旋转标记写在那里）：
+    /// <c>A B D E F G…</c> 是 0，<c>6 8 J L O Q U V W</c> 是 1，
+    /// <c>1 2 5</c> 是 2，<c>0 C S</c> 是 3。
+    /// </para>
+    /// <para>
+    /// 旧实现靠它「一次到位」，不用猜：
+    /// <c>for (l = 0; l &lt; letter.rotate; ++l) polygon = rotatePolygon(polygon);</c>
+    /// 用 bbox 宽高比去猜会在<b>正方形 bbox</b>（45° 对角纸带恰好 N×N）上摇摆，
+    /// 成品朝向就随格数隔一个跳一次。
+    /// </para>
+    /// </summary>
+    public int Rotate { get; set; }
+
     public Master(string text)
     {
         Text = text;

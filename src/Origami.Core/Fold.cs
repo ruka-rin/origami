@@ -396,6 +396,15 @@ public static class FoldOps
 
     /// <summary>长条母版 -&gt; <see cref="FoldedModel"/>（一张连续的纸，链式顺次折）。</summary>
     /// <param name="mv">峰谷序列，长度须等于折痕数。</param>
+    /// <param name="orient">
+    /// 是否摆正成品。
+    /// <para>
+    /// 优先用 <see cref="Master.Rotate"/>（来自字模编码的 <c>@</c> 计数，
+    /// 由第一个字母决定）—— 旧实现就是这么「一次到位」的。
+    /// 该信息缺失时（手工输入的母版串没有编码来源）才退回
+    /// <see cref="OrientLandscape"/> 按 bbox 猜。
+    /// </para>
+    /// </param>
     public static FoldedModel FoldStrip(Master master, IReadOnlyList<string> mv, bool orient = true)
     {
         var (faces, creases, _) = MasterOps.ChainFromMaster(master);
@@ -409,7 +418,12 @@ public static class FoldOps
             mvMap[CreaseOwner(creases[i], faces)] = mv[i];
 
         var fm = new FoldedModel(world, rank, mvMap, mv.ToList(), faces, creases);
-        return orient ? fm.OrientLandscape() : fm;
+        if (!orient) return fm;
+
+        // 字模编码里带了旋转次数就用它 —— 确定性，不会摇摆
+        if (master.Rotate > 0) return fm.Rotate90(master.Rotate % 4);
+
+        return fm.OrientLandscape();
     }
 
     /// <summary>找出这条折痕所归属的面（拿它当着色字典的键）。</summary>
