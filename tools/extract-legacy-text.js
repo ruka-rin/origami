@@ -119,6 +119,8 @@ const TEXTS = [
   'A\nB', 'AB\nCD', 'A\nB\nC', 'ABC\nDEF', 'A B C',
   'THE QUICK BROWN', 'A\n\nB', '  A  ', '1234567890',
   'Z\nY\nX', 'QWERTY', 'ASDFGH', '0000', '8888',
+  // 用户实测出现过朝向问题的词，加进基准
+  'SOS', 'V', 'L', 'X', 'M', 'SOSO',
 ];
 
 const results = {};

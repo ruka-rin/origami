@@ -37,6 +37,8 @@
   <ItemGroup>
     <None Include="legacy_font.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="legacy_text.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="legacy_letters.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="legacy_multi.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- 权威题面基准（方形 CP 折痕图），作为回归测试的黄金样本 -->

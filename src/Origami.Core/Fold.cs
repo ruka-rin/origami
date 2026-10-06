@@ -175,30 +175,47 @@ public sealed class FoldedModel
     /// </para>
     /// </summary>
     /// <summary>
-    /// 成品摆正：<b>不做整体旋转</b>，只归位到第一象限。
+    /// 成品摆正：<b>按字模的 rotate 约定旋转，再归位到第一象限</b>。
     /// <para>
-    /// ★ 这里<b>不</b>用 <see cref="Master.Rotate"/> 做 90° 旋转。
-    /// 实测（同一母版渲染四种 rotate）：
+    /// rotate 是字模自带的属性（编码里 <c>@</c> 的个数），它决定字母
+    /// <b>本身的站立方向</b>。实测（格为单位）：
     /// <list type="bullet">
-    /// <item><b>KRENIO</b> rotate=0 字母正立；1/2/3 分别是侧躺、倒立、侧躺</item>
-    /// <item><b>SOS</b> rotate=0与 1 都正立；3 是上下颠倒</item>
+    /// <item><b>A</b> rotate=0：折叠结果 3×5，与旧实现 6×10（半格）吻合，无需旋转</item>
+    /// <item><b>V</b> rotate=1：折叠结果 5×3，旋转 90° 后 3×5 = 旧实现的 6×10</item>
+    /// <item><b>L</b> rotate=1：同上</item>
     /// </list>
-    /// 即<b>折叠的自然结果（rotate=0）本来就是正的</b>，rotate 里的
-    /// 3 会把字母转成颠倒。
+    /// 多字母文本（KRENIO/PROTEIN/SOS）的首字母 rotate 决定整行朝向，
+    /// 旧实现的 bbox 也是横向的（如 SOS 22×10 半格 = 11×5 格）。
     /// </para>
     /// <para>
-    /// 为什么会走到这一步：旧实现的 <c>rotatePolygon</c> 是对<b>每个多边形</b>
-    /// 单独施加的，等价于整体旋转；本项目整体旋转后<b>坐标系朝向也跟着变</b>，
-    /// 而渲染层的 <c>flipY</c>（<c>Sy = y1 - p.Y</c>）假定输入是 y 向上的数学坐标
-    /// —— rotate=3 把这个前提破坏了，负y 的笔画被翻到画布上方。
+    /// ★ 曾一度撤掉这里的旋转，理由是「渲染出的 SOS 上下颠倒」——
+    /// 但当时母版还缺了首尾两块空白片（见 <c>CreasesToMaster</c>），
+    /// 形状本身就是错的，那个判断不成立。<b>先修数据，再判方向。</b>
     /// </para>
     /// <para>
-    /// 归位仍要做：<c>Rotate90</c> 之外，折叠结果本身也可能落在负半轴
-    /// （起点是纸带最左端但 y 未必为 0），<c>flipY</c> 要求一个规整的 bbox。
+    /// ★ <b>旋转量取负</b>（<c>Rotate90(4 - rotate)</c>）。旧实现的
+    /// <c>rotatePoint</c> 是 <c>(x,y) → (-y,x)</c>，作用在它自己的坐标系上；
+    /// 本项目走「数学坐标（y 向上）+ 渲染层 flipY」两条腿，而 flipY 本身
+    /// 是一次镜像 —— 镜像会翻转旋转的手性，所以同一个约定值在本项目里
+    /// 要按<b>相反方向</b>转才能落到同样的视觉朝向。
+    /// </para>
+    /// <para>
+    /// 实测（把成品栅格化成 72×72 掩码后与旧实现求 IoU，1.0 为完全重合）：
+    /// <code>
+    /// 约定 rotate :  0     1     2     3
+    /// 应取 rotate :  0     3     2     1
+    /// 该 rotate 下 :  0.996 0.997 1.000 0.998   (X/M/A/E/F/G/…)
+    /// </code>
+    /// 18 个字模/词在正确 rotate 下 IoU 全部 ≥ 0.996
+    /// （V 0.998、L 1.000、6 0.998、68S 0.997、S 0.998、SOS 0.998、KRENIO 0.997）。
+    /// </para>
+    /// <para>
+    /// <b>归位</b>不可省：<c>Rotate90</c> 绕原点转会把顶点甩到负半轴，
+    /// 渲染层的 <c>flipY</c>（<c>Sy = y1 - p.Y</c>）要求规整的 bbox。
     /// </para>
     /// </summary>
     public FoldedModel OrientWriting(int rotate)
-        => Normalize();
+        => Rotate90((4 - rotate % 4) % 4).Normalize();
 
     public double AreaFlat() => FacesFlat.Sum(Geom.PolyArea);
 
@@ -505,6 +522,17 @@ public static class FoldOps
         var (world, _) = RollFold(faces, creases);
         var rank = LayerRanks(faces.Count, creases, mv);
 
+        // ★ 母版以 `|` 开头（<c>Pipes</c> 含 0）表示纸带起点端有一道竖折痕。
+        // 它切出的面片宽度为零，平面剖分产生不出这种退化面片，但<b>那条反射线
+        // 是真实的</b>：旧实现会对每个面片依次反射之前所有折痕，其中就包含它，
+        // 效果等于把整个成品沿 x=0 左右翻转（矩阵上是最外层的一次 Reflect）。
+        // 少了这一次镜像，L / 68S 的形状就与旧实现不符。
+        //
+        // 必须补在<b>最外层</b>（rotate 之前 —— 本函数在 OrientWriting 前调用，
+        // 故此处正好），因为旧实现里 x=0 折痕是所有面片共有的最外一层。
+        if (master.Pipes.Contains(0))
+            world = world.Select(f => f.Select(p => new Point(-p.X, p.Y)).ToList()).ToList();
+
         // 必须同时给出 MvMap 与 MvSeq：渲染层优先读 MvMap（按面下标取），
         // 只给 MvSeq 的话 MvMap 是空的，着色会被静默跳过（成品一片空白）。
         var mvMap = new Dictionary<int, string>();
@@ -514,9 +542,14 @@ public static class FoldOps
         var fm = new FoldedModel(world, rank, mvMap, mv.ToList(), faces, creases);
         if (!orient) return fm;
 
-        // 有编码来源（文本生成）-> 用字模的 rotate 约定 + 书写方向判据，
-        // 两者都是确定性的，不会像 bbox 猜法那样在正方形上摇摆
-        if (master.Rotate > 0) return fm.OrientWriting(master.Rotate);
+        // ★ 判据是「rotate 有没有来源」，不是「rotate 是否非零」。
+        // 曾经写成 `master.Rotate > 0`，于是 rotate=0 的整组字模
+        // （A K M N P R T X Y Z …）被当成「没有 rotate 信息」而走 bbox 猜法，
+        // 把本来竖立的成品（A 折叠结果 3×5，与旧实现吻合）
+        // 强行转成横向 5×3 —— 字母全部躺倒。
+        //
+        // 有编码来源（文本生成）-> 用字模的 rotate 约定，即便它是 0
+        if (master.RotateKnown) return fm.OrientWriting(master.Rotate);
 
         // 手工输入的母版串没有编码来源 -> 退回按 bbox 猜
         return fm.OrientLandscape();

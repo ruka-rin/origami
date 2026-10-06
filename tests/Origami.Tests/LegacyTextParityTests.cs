@@ -141,18 +141,32 @@ public class LegacyTextParityTests
     }
 
     /// <summary>
-    /// 母版串末尾不应有素格 —— 这条对<b>多字符文本</b>尤其重要：
-    /// 编码尾部的 <c>_</c> 会留下不落折痕的两格，单字模看不出来。
+    /// 母版格数必须等于<b>旧实现编码占用的总宽度</b>。
+    /// <para>
+    /// ★ 这条取代了原先的「母版不以素格结尾」—— 那条断言是<b>错的</b>，
+    /// 而且正是单字母折不全的根因。编码首尾的 <c>_</c>/空格只前进不落折痕，
+    /// 但它们对应的是<b>真实的纸面</b>：V 的 6 个面片里首尾两片（面积各 18）
+    /// 就是这两段空白，裁掉它们 V 只剩中间一小截。
+    /// </para>
+    /// <para>
+    /// 旧实现没有母版串概念，但它记录了 <c>width</c>（半格单位）——
+    /// 格数就该是 <c>width / 2</c>，既不裁头也不裁尾。
+    /// </para>
     /// </summary>
     [Theory]
     [InlineData("KRENIO")] [InlineData("123456")] [InlineData("68S")]
     [InlineData("HELLO WORLD")] [InlineData("A\nB")] [InlineData("A\nB\nC")]
     [InlineData("THE QUICK BROWN")] [InlineData("SIX")] [InlineData("8888")]
-    public void 文本生成的母版不以素格结尾(string text)
+    public void 文本生成的母版格数等于旧实现的编码总宽度(string text)
     {
+        string key = $"{text}|left=0|mirror=0";
+        if (!Legacy.TryGetValue(key, out var want)) return;
+
         string master = FoldFont.TextToMaster(text);
         Assert.NotEqual("", master);
-        Assert.False(master.EndsWith('.'), $"「{text.Replace("\n", "\\n")}」的母版以素格结尾");
+
+        var m = Master.ParseMaster(master);
+        Assert.Equal(want.Width / 2, m.NCell);
     }
 
     /// <summary>

@@ -39,8 +39,29 @@ public sealed class Master
     /// 用 bbox 宽高比去猜会在<b>正方形 bbox</b>（45° 对角纸带恰好 N×N）上摇摆，
     /// 成品朝向就随格数隔一个跳一次。
     /// </para>
+    /// <para>
+    /// ★ 赋值即代表「这个值有来源」（见 <see cref="RotateKnown"/>）。
+    /// rotate=0 也是<b>有效</b>的约定（A/K/M/N… 就属于这一组），
+    /// 不能因为它等于默认值就当成「没有 rotate 信息」。
+    /// </para>
     /// </summary>
-    public int Rotate { get; set; }
+    public int Rotate
+    {
+        get => _rotate;
+        set { _rotate = value; RotateKnown = true; }
+    }
+
+    int _rotate;
+
+    /// <summary>
+    /// <see cref="Rotate"/> 是否真有来源 —— 即是否由字模编码给出。
+    /// <para>
+    /// 手工输入的母版串没有编码来源，此时 <see cref="Rotate"/> 是默认值 0，
+    /// 折叠只能退回 bbox 猜法；而<b>文本生成</b>的成品即便 rotate=0 也必须用
+    /// 字模约定（A 折叠出来就是竖立的 3×5，按 bbox 猜会被转成横向 5×3）。
+    /// </para>
+    /// </summary>
+    public bool RotateKnown { get; private set; }
 
     public Master(string text)
     {

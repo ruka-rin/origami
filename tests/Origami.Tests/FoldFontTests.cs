@@ -106,28 +106,14 @@ public class FoldFontTests
         Assert.All(blanks, c => Assert.Equal('.', c));
     }
 
-    /// <summary>
-    /// 母版不应以<b>没有折痕的素格</b>结尾。
-    /// <para>
-    /// 编码末尾的 <c>_</c> 会「前进两格但不留折痕」，而折痕转母版时若用
-    /// 编码总宽度（含首尾哨兵）算格数，末尾就会多出一个素格 ——
-    /// 表现为「123456」生成的母版以 <c>|.</c> 结尾。多出的素格不含折痕，
-    /// 折叠时是一段没被折的纸尾，属于缺陷而非无害的补白。
-    /// </para>
-    /// </summary>
-    [Theory]
-    [InlineData("123456")]
-    [InlineData("A")]
-    [InlineData("1")]
-    [InlineData("HELLO")]
-    [InlineData("ABCDEF")]
-    [InlineData("KRENIO")]
-    public void 母版不以素格结尾(string text)
-    {
-        string master = FoldFont.TextToMaster(text);
-        Assert.NotEqual("", master);
-        Assert.False(master.EndsWith('.'), $"「{text}」的母版以素格结尾：…{master[^6..]}");
-    }
+    // ------------------------------------------------------------------
+    // ★ 原先这里的「母版不以素格结尾」已<b>删除</b>：那条断言是错的。
+    // 编码首尾的 `_` 只前进不落折痕，但它们对应真实的纸面 ——
+    // V 的 6 个面片里首尾两片（面积各 18，是最大的两片）就是这两段空白，
+    // 裁掉它们 V 只剩中间一小截，正是「单字母折不全」的根因。
+    // 取代它的是 LegacyTextParityTests.文本生成的母版格数等于旧实现的编码总宽度，
+    // 那条以旧实现实测的 width 为基准，不再靠猜。
+    // ------------------------------------------------------------------
 
     /// <summary>
     /// 母版末尾不应有素格，但<b>不能因此丢格</b>。
