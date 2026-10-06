@@ -6,7 +6,7 @@
         mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="720"
         x:Class="Origami.Desktop.MainWindow"
         Title="折纸谜题工具 — 母版到成品"
-        Width="1280" Height="720" MinWidth="900" MinHeight="560"
+        Width="1280" Height="720" MinWidth="1000" MinHeight="560"
         Background="{StaticResource Bgc.Base}">
 
   <Window.Styles>
@@ -134,14 +134,16 @@
 
     <!-- ═══════════ 底栏：状态 ═══════════ -->
     <Border DockPanel.Dock="Bottom" Background="{StaticResource Bgc.Chrome}">
-      <Grid Margin="18,8" ColumnDefinitions="Auto,*,Auto">
+      <Grid Margin="18,8" ColumnDefinitions="*,Auto,100">
         <TextBlock Grid.Column="0" Text="{Binding Status}" Foreground="{StaticResource Fg.Muted}"
+                   ToolTip.Tip="{Binding StatusDetail}"
                    VerticalAlignment="Center" Margin="0,0,20,0"
-                   TextTrimming="CharacterEllipsis" MaxWidth="280" />
+                   HorizontalAlignment="Left"
+                   TextTrimming="CharacterEllipsis" MinWidth="100" MaxWidth="300" />
         <TextBlock Grid.Column="1" Text="{Binding Summary}" Foreground="{StaticResource Fg.Base}"
                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
         <TextBlock Grid.Column="2" Text="{Binding ZoomText}" Foreground="{StaticResource Fg.Muted}"
-                   VerticalAlignment="Center" MinWidth="60" Margin="20,0,0,0"
+                   VerticalAlignment="Center" Margin="10,0,10,0"
                    TextAlignment="Right" />
       </Grid>
     </Border>

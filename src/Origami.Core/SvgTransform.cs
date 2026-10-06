@@ -44,7 +44,12 @@ public static class SvgTransform
         var (mA, mB, mC, mD, mE, mF) = t.Matrix(w, h);
 
         // 把所有子元素（含纸底 rect）移进一个新的 <g>
-        var content = new XElement("g",
+        //
+        // ★ 必须用<b>与根元素相同的命名空间</b>建 <g>。用 XElement("g") 建出来是无命名空间
+        // 的，序列化会写成 <g xmlns=""> —— 而 SVG 里带 xmlns="" 的元素<b>不属于 SVG 命名空间，
+        // 浏览器直接不渲染</b>：整张图凭空消失，且文件语法完全合法、肉眼极难发现。
+        // （曾因此让「旋转 / 镜像」按钮一点就白屏。）
+        var content = new XElement(root.Name.Namespace + "g",
             new XAttribute("transform", MatrixText(mA, mB, mC, mD, mE, mF)));
         foreach (var child in root.Elements().ToList())
         {

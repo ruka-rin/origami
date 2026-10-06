@@ -153,6 +153,58 @@ public class LegacyTextParityTests
     /// 格数就该是 <c>width / 2</c>，既不裁头也不裁尾。
     /// </para>
     /// </summary>
+    /// <summary>
+    /// <b>方形铺排</b>的折痕必须与旧实现<b>逐线段</b>一致。
+    /// <para>
+    /// 数据由 <c>tools/_legacy-square.js</c> 生成：它把旧实现
+    /// <c>showUnfoldedSquare</c> 的绘制调用换成记录器，跑出方形铺排的权威折痕表。
+    /// 这是唯一能直接验证铺排（而不是隔着折叠结果间接看）的手段。
+    /// </para>
+    /// <para>
+    /// ★ 这条测试的价值在于它能<b>把「铺排错」与「折叠错」分开</b>：
+    /// 排查 68S 多转 180° 时，先跑这条确认铺排逐线段一致（缺 0 多 0），
+    /// 才能把范围缩到折叠的 root 选择上。否则两个环节都会「看起来像错的」，
+    /// 而它们各自的近似实现又都能在多数输入上蒙对。
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData("A")] [InlineData("6")] [InlineData("V")] [InlineData("L")]
+    [InlineData("SOS")] [InlineData("68S")] [InlineData("KRENIO")] [InlineData("123456")]
+    public void 方形折痕与旧实现逐线段一致(string ch)
+    {
+        string p = Path.Combine(AppContext.BaseDirectory, "legacy_square.json");
+        if (!File.Exists(p)) return;
+        var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(p, Encoding.UTF8));
+        if (!doc.RootElement.TryGetProperty(ch, out var el)) return;
+
+        // 旧实现用半格单位，本项目的方形 CP 用格单位
+        var want = el.GetProperty("creases").EnumerateArray().Select(a =>
+        {
+            double x0 = a[0].GetDouble(), y0 = a[1].GetDouble();
+            double x1 = a[2].GetDouble(), y1 = a[3].GetDouble();
+            return $"{Math.Min(x0, x1) / 2:0.##},{Math.Min(y0, y1) / 2:0.##}-" +
+                   $"{Math.Max(x0, x1) / 2:0.##},{Math.Max(y0, y1) / 2:0.##}";
+        }).ToHashSet();
+
+        var (masterText, rotate) = FoldFont.TextToMasterWithRotate(ch);
+        var master = Master.ParseMaster(masterText);
+        master.Rotate = rotate;
+        var plan = SquareOps.PlanFromMaster(master);
+
+        var got = plan.Fold.Select(s =>
+            $"{Math.Min(s.A.X, s.B.X):0.##},{Math.Min(s.A.Y, s.B.Y):0.##}-" +
+            $"{Math.Max(s.A.X, s.B.X):0.##},{Math.Max(s.A.Y, s.B.Y):0.##}").ToHashSet();
+
+        var missing = want.Except(got).Take(4).ToList();
+        var extra = got.Except(want).Take(4).ToList();
+
+        Assert.True(missing.Count == 0 && extra.Count == 0,
+            $"「{ch}」方形折痕与旧实现不一致：旧有而本项目缺 {missing.Count} 条{Show(missing)}；" +
+            $"本项目多 {extra.Count} 条{Show(extra)}");
+    }
+
+    static string Show(List<string> xs) => xs.Count == 0 ? "" : "（如 " + string.Join(" / ", xs) + "）";
+
     [Theory]
     [InlineData("KRENIO")] [InlineData("123456")] [InlineData("68S")]
     [InlineData("HELLO WORLD")] [InlineData("A\nB")] [InlineData("A\nB\nC")]

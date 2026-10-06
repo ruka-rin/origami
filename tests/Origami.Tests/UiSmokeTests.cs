@@ -526,6 +526,8 @@ public class ViewModelTests
 
         // 母版应保持原值（DEBUG 构建下预填了样例，故不能假设为空）
         Assert.Equal(before, vm.MasterText);
-        Assert.Contains("字库", vm.Status);
+        // 状态栏只给短句，详细原因在悬停提示里（见 StatusDetail）
+        Assert.Equal("没有可用的字符", vm.Status);
+        Assert.Contains("字库", vm.StatusDetail);
     }
 }

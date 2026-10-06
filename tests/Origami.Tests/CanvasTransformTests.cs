@@ -121,6 +121,34 @@ public class CanvasTransformTests
 
     // ---------------------------------------------------------------- SVG 侧
 
+    /// <summary>
+    /// ★ 包裹内容的 <c>&lt;g&gt;</c> 必须与 <c>&lt;svg&gt;</c> 处于<b>同一个命名空间</b>。
+    /// <para>
+    /// 用 <c>XElement("g")</c> 建出来的是无命名空间的元素，序列化会写成
+    /// <c>&lt;g xmlns=""&gt;</c> —— 语法完全合法，但 SVG 里它<b>不属于 SVG 命名空间，
+    /// 浏览器直接不渲染</b>：点一下「旋转」整张图就白屏，且文件看不出任何毛病。
+    /// 这条测试守的就是它。
+    /// </para>
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(AllCombos))]
+    public void 变换后的分组不带空命名空间(int q, bool fx, bool fy)
+    {
+        var t = CanvasTransform.Create(q, fx, fy);
+        string outSvg = SvgTransform.Apply(SampleSvg(), t);
+
+        // 恒等变换按约定原样返回，不包分组
+        if (t.IsIdentity) { Assert.Equal(SampleSvg(), outSvg); return; }
+
+        Assert.DoesNotContain("xmlns=\"\"", outSvg);
+
+        // 按 SVG 命名空间查那个分组：它必须真的在命名空间里（否则会被浏览器丢掉）
+        var xdoc = System.Xml.Linq.XDocument.Parse(outSvg);
+        var ns = xdoc.Root!.Name.Namespace;
+        Assert.Equal("http://www.w3.org/2000/svg", ns.NamespaceName);
+        Assert.NotEmpty(xdoc.Descendants(ns + "g"));
+    }
+
     [Theory]
     [MemberData(nameof(AllCombos))]
     public void 施加变换后画布尺寸正确(int q, bool fx, bool fy)

@@ -100,6 +100,20 @@ public static class Views
 
         /// <summary>方形折叠成品 —— <b>树反射</b>：11×11 方形沿折痕树逐层反射。</summary>
         public required FoldedModel SquareFolded { get; init; }
+
+        /// <summary>
+        /// 文本生成时系统算出的<b>摆正变换</b>（来自字模的 rotate 约定）。
+        /// <para>
+        /// ★ 它<b>不烘焙进几何</b>：几何一律保持「原始方向」，摆正作为画布变换
+        /// 交给右下角的翻转按钮体现。这样用户看到的朝向 = 自动摆正 + 自己叠加的调整，
+        /// 「恢复原始方向」也才真的能回到未摆正的原始朝向。
+        /// </para>
+        /// <para>
+        /// 手工输入的母版串没有编码来源 -> <see cref="CanvasTransform.Identity"/>，
+        /// 由 <c>OrientLandscape</c> 的等价物直接作用在几何上。
+        /// </para>
+        /// </summary>
+        public CanvasTransform AutoXform { get; init; } = CanvasTransform.Identity;
     }
 
     /// <summary>
@@ -113,19 +127,32 @@ public static class Views
     /// 成品该转多少个 90°（来自字模编码的 <c>@</c> 计数，由第一个字母决定）。
     /// 传0 表示信息未知，<see cref="FoldOps.FoldStrip"/> 会退回按 bbox 猜朝向。
     /// </param>
-    public static Document Build(string masterText, int rotate = 0)
+    /// <param name="rotateKnown">
+    /// <paramref name="rotate"/> 是否真有来源（文本生成才有）。
+    /// 手工输入的母版串传 <c>false</c>，折叠层才会退回按 bbox 猜朝向。
+    /// </param>
+    public static Document Build(string masterText, int rotate = 0, bool rotateKnown = true)
     {
         var master = Master.ParseMaster(masterText);
-        master.Rotate = rotate;
+        // 只在有来源时赋值 —— Rotate 的 setter 本身就是「来源标记」
+        if (rotateKnown) master.Rotate = rotate;
         var strip = Model.StripModel(master);
         var plan = SquareOps.PlanFromMaster(master);
         var square = Model.SquareModel(plan);
 
         // 长条路径需要峰谷序列：折痕图里已按顺序存着，直接取
         var mv = strip.Folds.Select(f => f.MvType).ToList();
-        var stripFolded = FoldOps.FoldStrip(master, mv, orient: true);
-
+        // ★ 两条路径都产出<b>原始方向</b>，不在这里旋转 —— 摆正改由画布变换承担
+        // （见 AutoXform 的说明）。长条与方形的坐标系现已统一为数学坐标（y 向上），
+        // 所以同一个画布旋转对两者都成立，切换视图时方向不会跳。
+        var stripFolded = FoldOps.FoldStrip(master, mv, orient: false);
         var squareFolded = FoldOps.FoldSquare(plan, orient: false);
+        // 几何里摆正用的是 Rotate90(4 - rotate)（数学坐标、逆时针），而画布变换的
+        // QuarterTurns 是<b>顺时针</b>次数；渲染层还要把数学坐标 flipY 成屏幕坐标，
+        // 而 flipY 会翻转旋转手性 —— 两次翻转相抵，落到画布上恰好就是 rotate 本身。
+        var autoXform = master.RotateKnown
+            ? CanvasTransform.Create(rotate % 4)
+            : CanvasTransform.Identity;
 
         return new Document
         {
@@ -135,6 +162,7 @@ public static class Views
             Square = square,
             StripFolded = stripFolded,
             SquareFolded = squareFolded,
+            AutoXform = autoXform,
         };
     }
 
@@ -181,14 +209,14 @@ public static class Views
 
             ViewKind.SquareFolded =>
                 SvgIO.FoldedToSvg(squareF.World, squareF.Rank, squareF.MvMap,
-                                  unit: 28, pad: 18, color: peak, flipY: false),
+                                  unit: 28, pad: 18, color: peak, flipY: true),
 
             // 原子片分解本来就每面一色，不受上色开关影响
             ViewKind.StripPieces =>
                 SvgIO.PiecesToSvg(stripF.World, unit: 24, pad: 16, flipY: true),
 
             ViewKind.SquarePieces =>
-                SvgIO.PiecesToSvg(squareF.World, unit: 24, pad: 16, flipY: false),
+                SvgIO.PiecesToSvg(squareF.World, unit: 24, pad: 16, flipY: true),
 
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "未知视图"),
         };
@@ -226,10 +254,10 @@ public static class Views
                 : PngIO.RenderCreaseBlack(doc.Square, cu, cu, lw: 1.6 * scale),
 
             ViewKind.StripFolded => RenderFold(stripF, fu, flipY: true),
-            ViewKind.SquareFolded => RenderFold(squareF, fu, flipY: false),
+            ViewKind.SquareFolded => RenderFold(squareF, fu, flipY: true),
 
             ViewKind.StripPieces => PngIO.RenderPieces(stripF.World, fu, fu * 0.6, flipY: true),
-            ViewKind.SquarePieces => PngIO.RenderPieces(squareF.World, fu, fu * 0.6, flipY: false),
+            ViewKind.SquarePieces => PngIO.RenderPieces(squareF.World, fu, fu * 0.6, flipY: true),
 
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "未知视图"),
         };

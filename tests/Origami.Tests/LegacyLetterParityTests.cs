@@ -182,6 +182,90 @@ public class LegacyLetterParityTests
         Assert.True(iou >= 0.99, $"「{ch}」与旧实现的形状重合度仅 {iou:0.###}（应 ≥ 0.99）");
     }
 
+    /// <summary>
+    /// <b>方形成品</b>必须与长条成品是同一个形状（同一张纸的两种铺排）。
+    /// <para>
+    /// 方形折叠走的是「树反射」，与长条的「顺次滚动」是两条实现路径，
+    /// 但两者折叠的是<b>同一串折痕</b> —— 成品形状必须一致，否则说明
+    /// 方形这条路径有问题。这条长期缺失，导致方形成品一直没被验证：
+    /// 实测曾发现 ① 方形完全不按字模 rotate 摆正（V 折成横带子、SOS 竖排）；
+    /// ② 母版含 x=0 竖折痕时少了左右镜像（L/6/1/5/123456/68S 与长条对不上）。
+    /// </para>
+    /// <para>
+    /// 判据用栅格化 IoU（保留宽高比），对坐标系方向与面片划分方式免疫。
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData("A")] [InlineData("B")] [InlineData("E")] [InlineData("F")]
+    [InlineData("G")] [InlineData("H")] [InlineData("I")] [InlineData("J")]
+    [InlineData("K")] [InlineData("L")] [InlineData("M")] [InlineData("N")]
+    [InlineData("O")] [InlineData("P")] [InlineData("R")] [InlineData("S")]
+    [InlineData("T")] [InlineData("U")] [InlineData("V")] [InlineData("W")]
+    [InlineData("X")] [InlineData("Y")]
+    [InlineData("0")] [InlineData("1")] [InlineData("5")] [InlineData("6")]
+    [InlineData("8")]
+    [InlineData("KRENIO")] [InlineData("PROTEIN")] [InlineData("SOS")]
+    [InlineData("68S")] [InlineData("123456")] [InlineData("HELLO")]
+    public void 方形成品与长条成品形状一致(string ch)
+    {
+        var (masterText, rotate) = FoldFont.TextToMasterWithRotate(ch);
+        var master = Master.ParseMaster(masterText);
+        master.Rotate = rotate;
+
+        var stripModel = Model.StripModel(master);
+        var mv = stripModel.Folds.Select(f => f.MvType).ToList();
+
+        var strip = FoldOps.FoldStrip(master, mv, orient: true);
+        var plan = SquareOps.PlanFromMaster(master);
+        var square = FoldOps.FoldSquare(plan, orient: true, rotate: rotate, rotateKnown: true);
+
+        if (strip.World.Count == 0 || square.World.Count == 0) return;
+
+        double iou = IoU(Mask(ToPairs(strip.World), flipY: true),
+                         Mask(ToPairs(square.World), flipY: true));
+
+        Assert.True(iou >= 0.99,
+            $"「{ch}」方形成品与长条成品形状不一致（IoU {iou:0.###}）—— 方形那条折叠路径有问题");
+    }
+
+    /// <summary>
+    /// 含 x=0 竖折痕的母版，其方形成品必须经过一次左右镜像。
+    /// <para>
+    /// 与长条同源：x=0 的竖折痕切出的面片宽为零，平面剖分产生不出来，
+    /// 但那条反射线会镜像其后所有面片。方形与长条用<b>同一个判据</b>
+    /// （<c>Pipes.Contains(0)</c>），否则两条路径会给出不同朝向。
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData("G")] [InlineData("F")] [InlineData("E")] [InlineData("L")]
+    [InlineData("6")] [InlineData("1")] [InlineData("5")] [InlineData("68S")]
+    [InlineData("123456")]
+    public void 含零号竖折痕的母版成品需要镜像(string ch)
+    {
+        var (masterText, rotate) = FoldFont.TextToMasterWithRotate(ch);
+        var master = Master.ParseMaster(masterText);
+        master.Rotate = rotate;
+        Assert.Contains(0, master.Pipes);
+
+        var stripModel = Model.StripModel(master);
+        var mv = stripModel.Folds.Select(f => f.MvType).ToList();
+        var strip = FoldOps.FoldStrip(master, mv, orient: true);
+        var plan = SquareOps.PlanFromMaster(master);
+
+        // 关掉镜像（把 0 号折痕抹去）后应当对不上，说明这次镜像确实在起作用
+        var planNoMirror = SquareOps.PlanFromMaster(master);
+        planNoMirror.Pipes.Remove(0);
+        var wrong = FoldOps.FoldSquare(planNoMirror, orient: true, rotate: rotate, rotateKnown: true);
+
+        double ok = IoU(Mask(ToPairs(strip.World), flipY: true),
+                        Mask(ToPairs(FoldOps.FoldSquare(plan, orient: true, rotate: rotate, rotateKnown: true).World), flipY: true));
+        double bad = IoU(Mask(ToPairs(strip.World), flipY: true),
+                         Mask(ToPairs(wrong.World), flipY: true));
+
+        Assert.True(ok >= 0.99, $"「{ch}」补镜像后仍对不上（IoU {ok:0.###}）");
+        Assert.True(bad < 0.95, $"「{ch}」不补镜像居然也对得上（IoU {bad:0.###}）—— 这条断言失去意义");
+    }
+
     /// <summary>多边形面积（鞋带公式），用于筛掉退化面片与做形状指纹。</summary>
     static double Area(IEnumerable<(double X, double Y)> p)
     {

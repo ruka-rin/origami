@@ -115,6 +115,21 @@ public sealed class FoldedModel
     }
 
     /// <summary>
+    /// 关于<b>水平</b>中心轴镜像（即上下翻转）。
+    /// <para>
+    /// 用来把方形折叠的<b>屏幕坐标</b>（y 向下）转成与长条一致的<b>数学坐标</b>
+    /// （y 向上）。两条路径的坐标系统一后，「摆正」才能共用同一套画布变换 ——
+    /// 否则同一个 rotate 约定在两种坐标里旋转手性相反，会各转各的。
+    /// </para>
+    /// </summary>
+    public FoldedModel MirrorAboutX()
+    {
+        var b = Bbox();
+        double axis = (b.Y0 + b.Y1) / 2;
+        return Map(p => new Point(p.X, 2 * axis - p.Y));
+    }
+
+    /// <summary>
     /// 平移到<b>第一象限</b>（y 从 0 向上为正）。
     /// <para>
     /// 旋转 90° 后顶点可能落到负半轴（如 SOS 的 y∈[-5,0]），而渲染层
@@ -394,7 +409,13 @@ public static class FoldOps
                 $"方形 CP 的对偶图不是树：{faces.Count} 面 / {nCrease} 折痕邻接" +
                 $"（应为 {faces.Count - 1}）。常见原因：面片构建时删掉了共线顶点，导致折痕端点丢失。");
 
-        // root：缺省取 x+y 最小的叶子（题面左上角）
+        // root：缺省取<b>贴着方形左上角 (0,0) 的那片叶子</b> —— 那是纸带的「起笔端」，
+        // 与长条取「质心 x 最小」是同一个物理位置（铺排都是从左上的原点起笔）。
+        //
+        // ★ 判据用「面内顶点的最小 x+y」，<b>不能</b>用「质心 x+y 最小」：
+        // 纸带第 0 格可能是个细长条，质心离角点很远，而它旁边那片「贴左边但不在
+        // 顶行」的叶子质心反而更小 —— 于是起点被选错，成品比长条多转 180°。
+        // 实测 68S / V 正是如此（默认 root=1，正确 root=0）；SOS 则是巧合选对。
         if (rootIdx is null)
         {
             var leaves = Enumerable.Range(0, faces.Count)
@@ -404,8 +425,9 @@ public static class FoldOps
             {
                 var best = leaves.MinBy(i =>
                 {
-                    var c = Geom.PolyCentroid(faces[i]);
-                    return (c.X + c.Y, c.X);
+                    double minSum = faces[i].Min(p => p.X + p.Y);
+                    double minX = faces[i].Min(p => p.X);
+                    return (minSum, minX);
                 });
                 rootIdx = best;
             }
@@ -495,14 +517,39 @@ public static class FoldOps
     }
 
     /// <summary>方形 CP -&gt; <see cref="FoldedModel"/>（树反射）。</summary>
-    public static FoldedModel FoldSquare(SquarePlan plan, bool orient = true)
+    public static FoldedModel FoldSquare(SquarePlan plan, bool orient = true,
+                                         int rotate = 0, bool rotateKnown = false,
+                                         int? rootIdx = null)
     {
-        var (world, mv, depth, _, faces) = SquareFold(plan);
+        var (world, mv, depth, _, faces) = SquareFold(plan, rootIdx);
+
+        // ★ 与长条同一个物理含义：母版含 0 号竖折痕（x=0）时，成品要左右镜像一次
+        // （详见 FoldStrip 里的同名处理）。方形与长条的差别只有两点：
+        //   ① 方形是屏幕坐标（y 向下），长条是数学坐标（y 向上）；
+        //   ② 图形由树反射而非顺次滚动得到。
+        // 实测（与长条成品求栅格化 IoU，1.0 为完全重合）：
+        //   补镜像 + Rotate90(rotate)   -> 18 个字模/词里 17 个达到 1.0
+        //   不补镜像                    -> G/F/L/6/1/5/123456/68S 只有 0.1~0.6
+        //   用 Rotate90(4-rotate)（长条的那套）-> L/6/SOS/S 反过来错
+        // 原因同长条的「取负」：两套坐标系互为镜像，旋转手性相反 —— 长条取负、
+        // 方形不取负，落到屏幕上才是同一个朝向。
+        if (plan.Pipes.Contains(0))
+            world = world.Select(f => f.Select(p => new Point(-p.X, p.Y)).ToList()).ToList();
+
         var rank = SquareLayerOrder(world.Count, mv, depth, faces);
         var creases = plan.Fold.Select(s => EdgeKey(s.A, s.B)).OrderBy(s => s.A).ThenBy(s => s.B).ToList();
         var fm = new FoldedModel(world, rank, mv, world, creases,
             new List<(List<int>, int)> { (Enumerable.Range(0, world.Count).ToList(), 0) });
-        return orient ? fm.OrientLandscape() : fm;
+
+        // ★ 统一到<b>数学坐标</b>（y 向上），与长条一致。
+        // 这样「摆正」能共用长条那套 OrientWriting，同一个 rotate 约定在两条路径
+        // 上含义相同（此前方形是屏幕坐标、旋转手性相反，只能各写一套规则）。
+        // 渲染层随之对方形也做 flipY —— 用户要的「通用渲染」正是这个意思。
+        fm = fm.MirrorAboutX();
+
+        if (!orient) return fm;
+        if (rotateKnown) return fm.OrientWriting(rotate);
+        return fm.OrientLandscape();
     }
 
     /// <summary>长条母版 -&gt; <see cref="FoldedModel"/>（一张连续的纸，链式顺次折）。</summary>

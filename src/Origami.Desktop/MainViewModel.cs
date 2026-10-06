@@ -85,11 +85,22 @@ public sealed class MainViewModel : Observable
             // 手改母版后，字模带来的旋转次数不再对应新内容 -> 作废，
             // 让折叠层退回按 bbox 猜（否则会把旧朝向硬套到新母版上）
             if (value != _masterRotateSource) _masterRotate = 0;
+            _masterRotateKnown = value == _masterRotateSource;
         }
     }
 
     /// <summary>生成母版时写入，用来识别「用户是否手改过母版」。</summary>
     string _masterRotateSource = "";
+
+    /// <summary>
+    /// 当前 <see cref="_masterRotate"/> 是否可信（即母版是文本生成的、没被手改过）。
+    /// <para>
+    /// ★ 折叠层要的是「rotate 有<b>没有来源</b>」，不是「值是否为 0」：
+    /// rotate=0 是一组字模（A K M N P R T X Y Z…）的<b>有效约定</b>，
+    /// 当成「无信息」就会退回 bbox 猜法把字母转躺下。
+    /// </para>
+    /// </summary>
+    bool _masterRotateKnown = true;
 
     Views.Document? _doc;
     /// <summary>当前母版对应的全流程结果；解析失败时为 null。</summary>
@@ -171,7 +182,7 @@ public sealed class MainViewModel : Observable
         string raw = TextInput;
         if (string.IsNullOrWhiteSpace(raw))
         {
-            Status = "请输入要生成的文本";
+            SetStatus("请输入要生成的文本");
             return;
         }
 
@@ -185,7 +196,7 @@ public sealed class MainViewModel : Observable
         }
         catch (Exception e)
         {
-            if (seq == _genSeq) Status = "生成失败：" + e.Message;
+            if (seq == _genSeq) SetStatus("生成失败：" + Short(e.Message), e.Message);
             return;
         }
 
@@ -193,7 +204,7 @@ public sealed class MainViewModel : Observable
 
         if (master.Length == 0)
         {
-            Status = "文本里没有字库支持的字符（A-Z 0-9 与空格）";
+            SetStatus("没有可用的字符", "文本里没有字库支持的字符（A-Z 0-9 与空格）");
             return;
         }
 
@@ -214,11 +225,83 @@ public sealed class MainViewModel : Observable
     // ---------------------------------------------------------------- 状态
 
     string _status = "就绪";
-    /// <summary>状态栏文本。</summary>
+    /// <summary>状态栏的<b>短</b>文本（如「已导入：长条SVG」）。详细内容见 <see cref="StatusDetail"/>。</summary>
     public string Status
     {
         get => _status;
         set => Set(ref _status, value);
+    }
+
+    string _statusDetail = "就绪";
+    /// <summary>
+    /// 状态栏的<b>详细</b>说明，显示为悬停提示。
+    /// <para>状态栏要的是一眼能扫完的一句话，细节（文件名、格式、异常原文、
+    /// 视图提示）都放这里，不占状态栏的版面。</para>
+    /// </summary>
+    public string StatusDetail
+    {
+        get => _statusDetail;
+        set => Set(ref _statusDetail, value);
+    }
+
+    /// <summary>设置状态栏：<paramref name="text"/> 是短句，<paramref name="detail"/> 是悬停详情。</summary>
+    public void SetStatus(string text, string? detail = null)
+    {
+        Status = text;
+        StatusDetail = detail ?? text;
+    }
+
+    /// <summary>把异常消息截成能塞进状态栏的一小段；原文仍进 <see cref="StatusDetail"/>。</summary>
+    public static string Short(string message, int max = 22)
+    {
+        string one = message.Split('\n', '\r')[0].Trim();
+        return one.Length <= max ? one : one[..max] + "…";
+    }
+
+    /// <summary>
+    /// 直接设定画布方向，<b>不</b>触发重渲染 —— 调用方自己负责随后渲染。
+    /// <para>用于「文本生成后把系统摆正写进画布方向」：那一步紧接着就要渲染一次，
+    /// 若走 <see cref="Xform"/> 的 setter 会白白多渲染一遍。</para>
+    /// </summary>
+    void ApplyXformSilently(CanvasTransform value)
+    {
+        if (_xform == value) return;
+        _xform = value;
+        IsXformIdentity = value.IsIdentity;
+        RaisePropertyChanged(nameof(Xform));
+        RaisePropertyChanged(nameof(XformDescription));
+        RaisePropertyChanged(nameof(CanResetXform));
+    }
+
+    /// <summary>
+    /// <b>当前视图</b>的规模摘要。
+    /// <para>只描述正在看的这一个视图 —— 把六种视图的信息一次列全会让状态栏变成噪音，
+    /// 而用户当下关心的只有眼前这张图。</para>
+    /// </summary>
+    string SummaryOf(ViewTab tab)
+    {
+        if (_doc is null) return "";
+        try
+        {
+            var m = Master.ParseMaster(_doc.MasterText);
+            return tab.Kind switch
+            {
+                ViewKind.Strip =>
+                    $"长条折痕图 · {m.NCell} 格 · 竖折痕 {m.Pipes.Count} · 折痕 {_doc.Strip.Folds.Count}",
+                ViewKind.StripFolded =>
+                    $"长条成品 · {_doc.StripFolded.World.Count} 片 · {BoxOf(_doc.StripFolded.World)} 格",
+                ViewKind.StripPieces =>
+                    $"长条原子片 · {_doc.StripFolded.World.Count} 片",
+                ViewKind.Square =>
+                    $"方形折痕图 · {_doc.Square.N}×{_doc.Square.N} · 折痕 {_doc.Square.Folds.Count}",
+                ViewKind.SquareFolded =>
+                    $"方形成品 · {_doc.SquareFolded.World.Count} 片 · {BoxOf(_doc.SquareFolded.World)} 格",
+                ViewKind.SquarePieces =>
+                    $"方形原子片 · {_doc.SquareFolded.World.Count} 片",
+                _ => "",
+            };
+        }
+        catch { return ""; }
     }
 
     string _summary = "";
@@ -457,7 +540,7 @@ public sealed class MainViewModel : Observable
     {
         if (Busy) return;
         Busy = true;
-        Status = "正在导入…";
+        SetStatus("正在导入…");
         try
         {
             var r = Importer.Load(text, fileName);
@@ -472,13 +555,15 @@ public sealed class MainViewModel : Observable
             // 必须调 RenderCurrentAsync：RebuildAsync 的 `if (Busy) return` 会挡掉它
             await RenderCurrentAsync("正在导入并渲染…");
 
-            string where = SelectedTab is null ? "" : $"（{SelectedTab.Title}）";
-            Status = r.Warning is { } w ? $"已导入 {fileName}{where}。注意：{w}"
-                                       : $"已导入 {fileName}{where}";
+            // 状态栏只给「形状 + 类型」这一句话，文件名与注意事项进悬停提示
+            string shape = SelectedTab?.Shape == ShapeKind.Square ? "方形" : "长条";
+            string detail = $"已导入 {fileName}" + (SelectedTab is null ? "" : $"（{SelectedTab.Title}）");
+            if (r.Warning is { } w) detail += "。注意：" + w;
+            SetStatus($"已导入：{shape}SVG", detail);
         }
         catch (Exception e)
         {
-            Status = "导入失败：" + e.Message;
+            SetStatus("导入失败：" + Short(e.Message), e.Message);
         }
         finally { Busy = false; }
     }
@@ -523,45 +608,45 @@ public sealed class MainViewModel : Observable
         if (string.IsNullOrWhiteSpace(raw))
         {
             ClearAll();
-            Status = "请输入母版";
+            SetStatus("请输入母版");
             return;
         }
 
         // 渲染序号：母版又变了就作废本次结果，避免慢的旧结果覆盖新内容
         int seq = ++_renderSeq;
         int rot = _masterRotate;
+        bool rotKnown = _masterRotateKnown;
 
         Busy = true;
-        Status = busyStatus;
+        SetStatus(busyStatus);
         try
         {
             // 铺排 + 折叠是 CPU 密集的，跑在后台以免冻结界面
-            var work = await Task.Run(() =>
-            {
-                var doc = Views.Build(raw, rot);
-                return (Doc: doc, Svg: Views.BuildSvg(doc, tab.Kind, Color, Xform));
-            });
+            var doc = await Task.Run(() => Views.Build(raw, rot, rotKnown));
 
             if (seq != _renderSeq) return;      // 已被更新的请求取代
 
-            _doc = work.Doc;
+            _doc = doc;
             _renderedMaster = raw;      // 只有成功落地的那次才算「已渲染」
-            InvalidateCaches();
-            SetSvg(work.Svg, tab);
 
-            var m = Master.ParseMaster(raw);
-            Summary = $"{m.NCell} 格 · 竖折痕 {m.Pipes.Count} · "
-                    + $"方形 {work.Doc.Square.N}×{work.Doc.Square.N} · "
-                    + $"折痕 {work.Doc.Square.Folds.Count} · "
-                    + $"长条成品 {BoxOf(work.Doc.StripFolded.World)} 格 · "
-                    + $"方形成品 {BoxOf(work.Doc.SquareFolded.World)} 格";
-            Status = Describe(tab);
+            // ★ 系统摆正体现在<b>画布方向</b>上，不烘焙进几何：
+            // 右下角的翻转按钮显示的就是「最终施加的翻转」，用户能在它之上继续转，
+            // 「恢复原始方向」也才真的能回到未摆正的原始朝向。
+            ApplyXformSilently(doc.AutoXform);
+            InvalidateCaches();
+
+            string svg = await Task.Run(() => Views.BuildSvg(doc, tab.Kind, Color, Xform));
+            if (seq != _renderSeq) return;      // 渲染期间又被取代
+            SetSvg(svg, tab);
+
+            Summary = SummaryOf(tab);
+            SetStatus($"已生成：{tab.Title}", Describe(tab));
         }
         catch (Exception e)
         {
             if (seq != _renderSeq) return;
             ClearAll();
-            Status = "出错：" + e.Message;
+            SetStatus("出错：" + Short(e.Message), e.Message);
         }
         finally
         {
@@ -578,7 +663,7 @@ public sealed class MainViewModel : Observable
     public async Task SelectViewAsync(ViewTab tab)
     {
         if (tab is null) return;
-        if (_doc is null) { Status = "请先解析母版"; return; }
+        if (_doc is null) { SetStatus("请先解析母版"); return; }
 
         SelectedTab = tab;
         // 原子片分解本来每面一色，上色开关对它无意义
@@ -588,7 +673,7 @@ public sealed class MainViewModel : Observable
         {
             SvgSource = cached;
             RaisePropertyChanged(nameof(HasSvg));
-            Status = Describe(tab);
+            Summary = SummaryOf(tab); SetStatus($"已切换：{tab.Title}", Describe(tab));
             return;
         }
 
@@ -596,17 +681,17 @@ public sealed class MainViewModel : Observable
         // 用递增序号保证「只有最后一次点击的结果能落地」。
         int seq = ++_viewSeq;
         Busy = true;
-        Status = $"正在构建 {tab.Title}…";
+        SetStatus($"正在构建 {tab.Title}…");
         try
         {
             var svg = await Task.Run(() => Views.BuildSvg(_doc, tab.Kind, Color, Xform));
             if (seq != _viewSeq) return;         // 已被更新的请求取代，丢弃
             SetSvg(svg, tab);
-            Status = Describe(tab);
+            Summary = SummaryOf(tab); SetStatus($"已切换：{tab.Title}", Describe(tab));
         }
         catch (Exception e)
         {
-            if (seq == _viewSeq) Status = "出错：" + e.Message;
+            if (seq == _viewSeq) SetStatus("出错：" + Short(e.Message), e.Message);
         }
         finally
         {
@@ -637,7 +722,7 @@ public sealed class MainViewModel : Observable
             do
             {
                 _rerenderPending = false;
-                Status = "正在更新画布…";
+                SetStatus("正在更新画布…");
                 // 每次循环都重新读取 Xform / Color：连点时要把中间态跳掉
                 var svg = await Task.Run(() => Views.BuildSvg(_doc!, tab.Kind, Color, Xform));
                 SetSvg(svg, tab);
@@ -649,7 +734,8 @@ public sealed class MainViewModel : Observable
         {
             Busy = false;
             // 出错时保留错误信息，不要被正常描述覆盖掉（否则界面完全无感知）
-            Status = err is { } m ? "出错：" + m : Describe(tab);
+            if (err is { } m) SetStatus("出错：" + Short(m), m);
+            else { Summary = SummaryOf(tab); SetStatus($"已切换：{tab.Title}", Describe(tab)); }
         }
     }
 

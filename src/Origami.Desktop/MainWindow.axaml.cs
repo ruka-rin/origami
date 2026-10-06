@@ -203,7 +203,7 @@ public partial class MainWindow : Window
             string text = await reader.ReadToEndAsync();
             await _vm.ImportAsync(text, file.Name);
         }
-        catch (Exception ex) { _vm.Status = "导入失败：" + ex.Message; }
+        catch (Exception ex) { _vm.SetStatus("导入失败：" + MainViewModel.Short(ex.Message), ex.Message); }
     }
 
     // ------------------------------------------------------------ 导出
@@ -212,7 +212,7 @@ public partial class MainWindow : Window
     {
         if (_vm.Document is null || _vm.SelectedTab is not { } tab)
         {
-            _vm.Status = "没有可导出的内容";
+            _vm.SetStatus("没有可导出的内容");
             return;
         }
 
@@ -222,7 +222,7 @@ public partial class MainWindow : Window
         var opt = await dialog.ShowDialog<ExportOptions?>(this);
         if (opt is null) return;      // 用户取消
 
-        _vm.Status = "正在导出…";
+        _vm.SetStatus("正在导出…");
         try
         {
             var (data, ext) = _vm.Export(tab, opt);
@@ -236,16 +236,20 @@ public partial class MainWindow : Window
                     ? new[] { new FilePickerFileType("SVG 矢量图") { Patterns = new[] { "*.svg" } } }
                     : new[] { new FilePickerFileType("PNG 位图") { Patterns = new[] { "*.png" } } },
             });
-            if (file is null) { _vm.Status = "已取消导出"; return; }
+            if (file is null) { _vm.SetStatus("已取消导出"); return; }
 
             await using var stream = await file.OpenWriteAsync();
             await stream.WriteAsync(data);
 
-            _vm.Status = opt.Format == ExportFormat.Svg
-                ? $"已导出 SVG（矢量，{data.Length / 1024} KB）"
-                : $"已导出 PNG {opt.PngScale:0.#}×（{data.Length / 1024} KB）";
+            // 状态栏只说「导出了什么形状的什么格式」，大小 / 倍率 / 视图名进悬停提示
+            string shape = tab.Shape == ShapeKind.Square ? "方形" : "长条";
+            string kind = opt.Format == ExportFormat.Svg ? "SVG" : "PNG";
+            string how = opt.Format == ExportFormat.Svg
+                ? $"SVG 矢量 · {data.Length / 1024} KB"
+                : $"PNG {opt.PngScale:0.#}× · {data.Length / 1024} KB";
+            _vm.SetStatus($"已导出：{shape}{kind}", $"{how} · {tab.Title}");
         }
-        catch (Exception ex) { _vm.Status = "导出失败：" + ex.Message; }
+        catch (Exception ex) { _vm.SetStatus("导出失败：" + MainViewModel.Short(ex.Message), ex.Message); }
     }
 
     // ------------------------------------------------------------ 画布方向
