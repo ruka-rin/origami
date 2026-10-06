@@ -67,17 +67,43 @@ public sealed class FoldedModel
     }
 
     /// <summary>
-    /// 把成品转成<b>横向可读</b>（宽 &gt; 高）。
+    /// 把成品转成<b>横向可读</b>（宽 &gt;= 高）。
     /// 成品落在哪个朝向取决于母版第 0 格的折痕方向，两种都合法，统一在这里摆正。
+    /// <para>
+    /// ★ 问题出在<b>bbox 恰好是正方形</b>的情形。沿 45° 对角延伸的纸带
+    /// （母版是若干个 <c>\</c> 时正是如此）的 bbox 是 N×N：
+    /// 奇数格是真方形，偶数格是纵向，于是 <c>width &gt;= height</c> 在奇数格判「已横向」
+    /// 而放弃旋转、偶数格判「竖直」而旋转 —— <b>隔一个跳一次</b>，
+    /// 视觉上就是斜线方向反复变。
+    /// </para>
+    /// <para>
+    /// 修法：正方形不是「已横向」的证据。正方形时统一<b>旋转</b>，
+    /// 让朝向在整个区间上连续；非正方形时仍按宽高比判断。
+    /// 这样奇偶格的处理一致，斜线方向不再跳变。
+    /// </para>
     /// </summary>
     public FoldedModel OrientLandscape()
     {
         var (x0, y0, x1, y1) = Bbox();
-        if ((x1 - x0) >= (y1 - y0)) return this;
+        double w = x1 - x0, h = y1 - y0;
+        const double eps = 1e-9;
+
+        bool square = Math.Abs(w - h) <= eps;
+
+        // 明确的宽 < 高：竖向，该转。
+        // 明确的宽 > 高：横向，不转。
+        // 恰好正方形：方向定不下来（对角带的巧合），**统一旋转**，
+        // 与相邻格数保持一致 —— 这是本函数存在的意义（摆正），
+        // 两种朝向本就都合法，不该在退化点上来回摇摆。
+        bool needsRotate = square ? true : (w < h);
+
+        if (!needsRotate) return this;
+
         var cand = Rotate90(1);
         var (a0, b0, a1, b1) = cand.Bbox();
-        // 转完未必更横向，只在确实变宽时采用
-        return (a1 - a0) > (b1 - b0) ? cand : this;
+        // 转完未必更横向，只在确实变宽时采用。
+        // 正方形时两者相等，故一律采用（避免又出现「两个答案」的分支）。
+        return (square || (a1 - a0) > (b1 - b0)) ? cand : this;
     }
 
     public double AreaFlat() => FacesFlat.Sum(Geom.PolyArea);

@@ -334,14 +334,71 @@ public class FoldTests
         Assert.Contains("峰谷序列长度", ex.Message);
     }
 
+    /// <summary>摆正后宽应不小于高（允许相等）。</summary>
+    /// <remarks>
+    /// 断言不能写「宽 &gt; 高」：沿 45° 对角延伸的纸带 bbox 恰好是正方形 N×N
+    /// （母版是若干个 <c>\</c> 时就是这样），此时宽高相等是正常结果。
+    /// </remarks>
     [Fact]
     public void 折叠成品可摆正为横向()
     {
         var m = Master.ParseMaster("/....|../\\.|.//.\\./.../\\./.");
         var fm = FoldOps.FoldStrip(m, MasterOps.DefaultMv(48));
         var (x0, y0, x1, y1) = fm.Bbox();
-        Assert.True((x1 - x0) >= (y1 - y0), "orient_landscape 后应为宽 >= 高");
+        Assert.True((x1 - x0) >= (y1 - y0) - 1e-9, "orient_landscape 后应为宽 >= 高");
     }
+
+    /// <summary>
+    /// 45° 对角纸带的朝向不该随格数在两个方向之间跳变。
+    /// <para>
+    /// 回归：<c>OrientLandscape</c> 曾用 bbox 宽高比判断是否旋转，而对角纸带的
+    /// bbox 恰好是正方形 N×N，判定在边界处随机翻转 —— 于是母版从
+    /// <c>\\</c> 增到 <c>\\\\</c> 时，成品的斜线视觉方向会突然反过来。
+    /// </para>
+    /// <para>
+    /// 判据：摆正后 bbox 必须<b>宽 &gt;= 高</b>（含正方形这种退化情形）。
+    /// 修好之前，奇数格会翻成纵向（宽 &lt; 高）。
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData(1)] [InlineData(2)] [InlineData(3)] [InlineData(4)]
+    [InlineData(5)] [InlineData(6)] [InlineData(7)] [InlineData(8)]
+    public void 对角纸带的朝向不随格数跳变(int n)
+    {
+        var m = Master.ParseMaster(new string('\\', n));
+        var fm = FoldOps.FoldStrip(m, MasterOps.DefaultMv(m.NCell));
+
+        var (x0, y0, x1, y1) = fm.Bbox();
+        double w = x1 - x0, h = y1 - y0;
+        Assert.True(w >= h - 1e-9,
+            $"{n} 格：对角带朝向错了，bbox {w:0.#}×{h:0.#}（宽应 >= 高）");
+    }
+
+    /// <summary>
+    /// 摆正后 bbox 宽度应随格数<b>单调不减</b>。
+    /// <para>
+    /// 比单点断言更强：修复前 2 格与 3 格、4 格与 5 格之间会发生翻转，
+    /// 尺寸序列是乱的。单调说明朝向在整个区间上保持一致。
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void 对角纸带的包围盒随格数单调增长()
+    {
+        double prevW = 0;
+        for (int n = 1; n <= 8; n++)
+        {
+            var m = Master.ParseMaster(new string('\\', n));
+            var fm = FoldOps.FoldStrip(m, MasterOps.DefaultMv(m.NCell));
+            var (x0, y0, x1, y1) = fm.Bbox();
+            double w = x1 - x0;
+
+            if (n > 1)
+                Assert.True(w >= prevW - 1e-9,
+                    $"{n} 格宽 {w:0.#} < {n - 1} 格宽 {prevW:0.#}，朝向在区间内翻转了");
+            prevW = w;
+        }
+    }
+
 
     [Fact]
     public void 方形对偶图必须是树()

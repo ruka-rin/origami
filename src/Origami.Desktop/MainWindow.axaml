@@ -114,6 +114,7 @@
                    MinHeight="100" MaxHeight="240"
                    AcceptsReturn="False"
                    TextWrapping="Wrap"
+                   MaxLength="5000"
                    VerticalContentAlignment="Top"
                    KeyDown="OnMasterKeyDown" LostFocus="OnMasterLostFocus"
                    ToolTip.Tip="可直接编辑母版串。回车或点别处即渲染（内容没变则跳过）" />
