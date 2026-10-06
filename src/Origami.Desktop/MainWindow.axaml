@@ -98,11 +98,11 @@
                    Text="{Binding TextInput}"
                    Watermark="{Binding TextWatermark}"
                    FontFamily="Consolas,Menlo,DejaVu Sans Mono,monospace"
-                   FontSize="12.5"
-                   MinHeight="104" MaxHeight="200"
-                   AcceptsReturn="True" TextWrapping="NoWrap"
+                   FontSize="16"
+                   MinHeight="50" MaxHeight="150"
+                   MaxLength="200"
+                   AcceptsReturn="True" TextWrapping="Wrap"
                    VerticalContentAlignment="Top"
-                   IsEnabled="{Binding !Busy}"
                    ToolTip.Tip="可分行输入（分行会折成蛇形）。边打边生成母版，回车用于换行" />
 
           <TextBlock Classes="section" Text="母版" Margin="0,10,0,0" />
@@ -110,13 +110,13 @@
                    Text="{Binding MasterText}"
                    Watermark="母版字符串，例如 /....|../.."
                    FontFamily="Consolas,Menlo,DejaVu Sans Mono,monospace"
-                   FontSize="12.5"
-                   MinHeight="70" MaxHeight="140"
+                   FontSize="12"
+                   MinHeight="100" MaxHeight="240"
                    AcceptsReturn="False"
+                   TextWrapping="Wrap"
                    VerticalContentAlignment="Top"
                    KeyDown="OnMasterKeyDown" LostFocus="OnMasterLostFocus"
-                   IsEnabled="{Binding !Busy}"
-                   ToolTip.Tip="可直接编辑母版串。回车或点别处即渲染" />
+                   ToolTip.Tip="可直接编辑母版串。回车或点别处即渲染（内容没变则跳过）" />
         </StackPanel>
 
         <!-- 文件操作。放左下角：与输入区同一条肌肉记忆（改内容 -> 存/取） -->

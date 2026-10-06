@@ -57,25 +57,31 @@ public partial class MainWindow : Window
 
     // ------------------------------------------------------------ 自动渲染
 
-    /// <summary>母版框回车即渲染。母版串里没有换行，所以回车不会有别的含义。</summary>
+    /// <summary>
+    /// 母版框回车即渲染。母版串里没有换行，所以回车不会有别的含义。
+    /// 内容没变时内部直接跳过 —— 折叠是 CPU 密集操作，不该为「只是按了回车」重算。
+    /// </summary>
     async void OnMasterKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
         e.Handled = true;
-        await RebuildAsync();
+        await RebuildIfChangedAsync();
     }
 
-    /// <summary>母版框失去焦点即渲染。</summary>
-    async void OnMasterLostFocus(object? sender, RoutedEventArgs e) => await RebuildAsync();
+    /// <summary>母版框失去焦点即渲染（内容变化时）。</summary>
+    async void OnMasterLostFocus(object? sender, RoutedEventArgs e)
+    {
+        await RebuildIfChangedAsync();
+    }
 
     // 文本框不再有 KeyDown / LostFocus：母版改成「边打边出」，
     // 回车留给换行（见 MainViewModel.ScheduleGenerate 的防抖逻辑）。
 
-    async Task RebuildAsync()
+    async Task RebuildIfChangedAsync()
     {
         // 先设取景模式再触发：Source 一变，Viewer 会按当前 DefaultFit 复位
         if (_vm.SelectedTab is { } t) Viewer.DefaultFit = EffectiveFit(t);
-        await _vm.RebuildAsync();
+        await _vm.RebuildIfChangedAsync();
     }
 
     /// <summary>

@@ -81,6 +81,59 @@ public class UiSmokeTests
         dlg.Close();
     }
 
+    /// <summary>
+    /// 母版框失焦时若内容没变，不应重新渲染。
+    /// <para>
+    /// 折叠是 CPU 密集操作，「只是点了别处」就重算既慢又让画面闪一下。
+    /// 这里断言：<b>没改内容</b>调 RebuildIfChangedAsync 不会重新生成 SVG；
+    /// 改了内容则会。这是「有没有失焦事件」之外的第二道判据。
+    /// </para>
+    /// </summary>
+    [AvaloniaFact]
+    public async Task 母版内容没变时不重新渲染()
+    {
+        var vm = new MainViewModel { MasterText = "/....|../.." };
+        await vm.RebuildAsync();
+        Assert.True(vm.HasSvg, "应已渲染出 SVG");
+
+        string before = vm.Summary;
+
+        // 内容未变 -> 跳过，摘要与 SVG 都保持原样
+        await vm.RebuildIfChangedAsync();
+        Assert.Equal(before, vm.Summary);
+
+        // 内容变了 -> 重新渲染，摘要随之改变
+        vm.MasterText = "/....|../..|/..\\";
+        await vm.RebuildIfChangedAsync();
+        Assert.NotEqual(before, vm.Summary);
+    }
+
+    /// <summary>
+    /// 文本输入过程中<b>焦点不能被抢走</b>。
+    /// <para>
+    /// 曾经的Bug：文本框带 <c>IsEnabled="{Binding !Busy}"</c>，而生成母版会置
+    /// <c>Busy=true</c> —— Avalonia 会把焦点从<b>被禁用</b>的控件上移走，
+    /// 于是每打一个字符焦点就被踢走，无法连续输入。
+    /// 症状是「只能输入一个字」，很怪但根因是焦点管理。
+    /// </para>
+    /// </summary>
+    [AvaloniaFact]
+    public void 文本框在生成过程中保持可用()
+    {
+        var win = new MainWindow();
+        win.Show();
+        win.Measure(new Size(1320, 760));
+        win.Arrange(new Rect(0, 0, 1320, 760));
+        win.UpdateLayout();
+
+        // IsHitTestVisible / IsEnabled 都不能绑 Busy —— 禁用即丢焦点
+        Assert.True(win.TextInputBox.IsEnabled, "文本框被禁用会导致焦点丢失");
+        Assert.True(win.MasterInputBox.IsEnabled, "母版框被禁用会导致焦点丢失");
+        Assert.True(win.TextInputBox.Focusable, "文本框应可获得焦点");
+
+        win.Close();
+    }
+
     /// <summary>主窗口画布上的五个视图选项都要有可见文字。</summary>
     [AvaloniaFact]
     public void 画布视图选项带有可见文字()

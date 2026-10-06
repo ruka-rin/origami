@@ -144,43 +144,52 @@ public sealed class MainViewModel : Observable
     /// <para>
     /// 落到母版框而不是另设一个只读展示框：母版框本来就是渲染的唯一来源，
     /// 落进去之后用户可直接编辑、导出、切视图，不用在两处之间同步。</para>
+    /// <para>
+    /// 连打时<b>不丢弃新输入</b>：每次调用递增序号，上一次还在算的请求
+    /// 作废（结果不落地），新的接着算。文本框始终可输入 ——
+    /// 用户不该因为折叠耗时而无法连续打字。
+    /// </para>
     /// </summary>
     public async Task GenerateFromTextAsync()
     {
-        if (Busy) return;
-        Busy = true;
+        string raw = TextInput;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            Status = "请输入要生成的文本";
+            return;
+        }
+
+        // 使更早的生成请求作废（哪怕它还在后台跑）
+        int seq = ++_genSeq;
+
+        string master;
         try
         {
-            string raw = TextInput;
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                Status = "请输入要生成的文本";
-                return;
-            }
-
-            string master;
-            try
-            {
-                master = await Task.Run(() => Origami.Core.FoldFont.TextToMaster(raw));
-            }
-            catch (Exception e)
-            {
-                Status = "生成失败：" + e.Message;
-                return;
-            }
-
-            if (master.Length == 0)
-            {
-                Status = "文本里没有字库支持的字符（A-Z 0-9 与空格）";
-                return;
-            }
-
-            MasterText = master;
-            // 必须调 RenderCurrentAsync：Busy 已置位，RebuildAsync 开头的守卫会挡掉它
-            await RenderCurrentAsync("正在生成并渲染…");
+            master = await Task.Run(() => Origami.Core.FoldFont.TextToMaster(raw));
         }
-        finally { Busy = false; }
+        catch (Exception e)
+        {
+            if (seq == _genSeq) Status = "生成失败：" + e.Message;
+            return;
+        }
+
+        if (seq != _genSeq) return;          // 已被更新的输入取代
+
+        if (master.Length == 0)
+        {
+            Status = "文本里没有字库支持的字符（A-Z 0-9 与空格）";
+            return;
+        }
+
+        MasterText = master;
+        await RenderCurrentAsync("正在生成并渲染…");
     }
+
+    /// <summary>
+    /// 文本生成的递增序号。只有<b>最后一次</b>输入的结果能落地，
+    /// 先前那些仍在后台计算的直接丢弃 —— 避免慢的旧结果覆盖快的新结果。
+    /// </summary>
+    int _genSeq;
 
     // ---------------------------------------------------------------- 状态
 
@@ -462,9 +471,30 @@ public sealed class MainViewModel : Observable
     }
 
     /// <summary>
+    /// 母版框<b>内容变化时</b>才渲染。
+    /// <para>
+    /// 失焦和回车都会调它，但「只是点了别处、没改内容」不该触发重算 ——
+    /// 折叠是 CPU 密集操作，无意义的重算既慢又会让画面闪一下。
+    /// 判据是<b>内容比对</b>而不是「有没有失焦事件」。
+    /// </para>
+    /// </summary>
+    public async Task RebuildIfChangedAsync()
+    {
+        if (MasterText == _renderedMaster) return;    // 没变，不动
+        await RebuildAsync();
+    }
+
+    /// <summary>
     /// 真正干活的渲染。<b>不做 Busy 守卫</b> —— 导入流程已经把自己置为 Busy，
     /// 再调 <see cref="RebuildAsync"/> 会被它的守卫直接挡掉，导入后就永远不渲染了。
     /// </summary>
+    /// <summary>
+    /// 最近一次<b>成功渲染</b>所用的母版串。用于「内容没变就不重算」。
+    /// 渲染失败或被更新的请求取代时不能更新它 —— 否则下次会比对失败、
+    /// 该重绘的界面不重绘。
+    /// </summary>
+    string _renderedMaster = "";
+
     async Task RenderCurrentAsync(string busyStatus)
     {
         var tab = SelectedTab ?? ViewTabs[0];
@@ -477,6 +507,9 @@ public sealed class MainViewModel : Observable
             return;
         }
 
+        // 渲染序号：母版又变了就作废本次结果，避免慢的旧结果覆盖新内容
+        int seq = ++_renderSeq;
+
         Busy = true;
         Status = busyStatus;
         try
@@ -488,7 +521,10 @@ public sealed class MainViewModel : Observable
                 return (Doc: doc, Svg: Views.BuildSvg(doc, tab.Kind, Color, Xform));
             });
 
+            if (seq != _renderSeq) return;      // 已被更新的请求取代
+
             _doc = work.Doc;
+            _renderedMaster = raw;      // 只有成功落地的那次才算「已渲染」
             InvalidateCaches();
             SetSvg(work.Svg, tab);
 
@@ -502,11 +538,20 @@ public sealed class MainViewModel : Observable
         }
         catch (Exception e)
         {
+            if (seq != _renderSeq) return;
             ClearAll();
             Status = "出错：" + e.Message;
         }
-        finally { Busy = false; }
+        finally
+        {
+            // 只有最后一次渲染负责解除 Busy —— 被取代的请求贸然清掉会让
+            // 新请求的「正在计算…」状态提前消失
+            if (seq == _renderSeq) Busy = false;
+        }
     }
+
+    /// <summary>渲染递增序号，用于作废过时的结果（连打母版 / 连续切换）。</summary>
+    int _renderSeq;
 
     /// <summary>切换视图（命中缓存则直接显示）。</summary>
     public async Task SelectViewAsync(ViewTab tab)
