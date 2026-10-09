@@ -71,6 +71,26 @@ public static class SvgTransform
             : doc.Declaration + Environment.NewLine + doc.ToString(SaveOptions.DisableFormatting);
     }
 
+    /// <summary>
+    /// 只把母版的方向标记<b>记进文件</b>，不施加任何变换。
+    /// <para>
+    /// 折痕图（长条/方形）不跟着摆正：折痕是数据，转过来看反而没法与母版串对照。
+    /// 但方向信息不能丢 —— 存成 <c>data-marks</c>，读回来仍是同一份母版。
+    /// </para>
+    /// </summary>
+    public static string Stamp(string svg, string marks)
+    {
+        if (marks.Length == 0) return svg;
+
+        var doc = XDocument.Parse(svg);
+        var root = doc.Root ?? throw new FormatException("SVG 根元素缺失");
+        root.SetAttributeValue("data-marks", marks);
+
+        return doc.Declaration == null
+            ? doc.ToString(SaveOptions.DisableFormatting)
+            : doc.Declaration + Environment.NewLine + doc.ToString(SaveOptions.DisableFormatting);
+    }
+
     static string MatrixText(double a, double b, double c, double d, double e, double f)
         => $"matrix({Num(a)} {Num(b)} {Num(c)} {Num(d)} {Num(e)} {Num(f)})";
 

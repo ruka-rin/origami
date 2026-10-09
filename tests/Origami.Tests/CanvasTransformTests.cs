@@ -222,6 +222,92 @@ public class CanvasTransformTests
         Assert.Equal(model.Strip.Folds.Count, back.Folds.Count);
     }
 
+    /// <summary>
+    /// 母版标记驱动<b>成品与原子片</b>，但<b>不驱动折痕图</b>。
+    /// <para>
+    /// 折痕是数据 —— 转过来看就没法与母版串逐格对照，所以折痕图不摆正，
+    /// 只把标记以 <c>data-marks</c> 写进文件；成品/原子片才是要「摆正」的那张图。
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData("G", "@@#")] [InlineData("E", "@@#")] [InlineData("6", "@@@#")]
+    [InlineData("S", "@@@")] [InlineData("A", "")] [InlineData("KRENIO", "")]
+    public void 只有成品与原子片跟着母版标记摆正(string text, string marks)
+    {
+        var doc = Views.Build(FoldFont.TextToMaster(text));
+        bool rotated = !doc.AutoXform.IsIdentity;
+        Assert.Equal(marks.Length > 0, rotated);
+        Assert.Equal(marks, Views.SvgMarks(doc));
+
+        foreach (var kind in new[] { ViewKind.StripFolded, ViewKind.StripPieces })
+        {
+            string svg = Views.BuildSvg(doc, kind, ColorMode.Peaks);
+            Assert.Equal(rotated, svg.Contains("<g transform=\"matrix("));
+        }
+
+        foreach (var kind in new[] { ViewKind.Strip, ViewKind.Square })
+        {
+            string svg = Views.BuildSvg(doc, kind, ColorMode.Peaks);
+            Assert.DoesNotContain("<g transform=\"matrix(", svg);      // 不摆正
+            Assert.Equal(marks, Grab(svg, "data-marks"));              // 但方向不丢
+        }
+    }
+
+    static string Grab(string svg, string attr)
+    {
+        int i = svg.IndexOf(attr + "=\"", StringComparison.Ordinal);
+        if (i < 0) return "";
+        int a = i + attr.Length + 2;
+        return svg[a..svg.IndexOf('"', a)];
+    }
+
+    /// <summary>
+    /// 母版摆正与用户调整是<b>分两步</b>套上去的，不能合成一个变换。
+    /// <para>
+    /// CanvasTransform 的 90° 绕的是「旋转后画布的中心」，这 16 种组合<b>对复合不封闭</b>：
+    /// 「先转 90° 再上下镜像」与「先上下镜像再转 90°」落在不同位置 ——
+    /// 实测前者把 (0,0) 送到 (50,50)、后者送到 (50,100)。
+    /// 合成一个就会平移错位，所以这里断言两层 <c>&lt;g&gt;</c> 各自独立。
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void 母版摆正与用户调整分两步套()
+    {
+        var doc = Views.Build(FoldFont.TextToMaster("G"));     // 标记 @@# -> 旋转 180°
+        var manual = CanvasTransform.Create(1, flipX: true);
+        Assert.Equal(CanvasTransform.Create(2), doc.AutoXform);
+
+        string svg = Views.BuildSvg(doc, ViewKind.StripFolded, ColorMode.Peaks, manual);
+        // 文档顺序 = 外层在前（后套的那层包住先套的）
+        var layers = Layers(svg);
+        Assert.Equal(2, layers.Count);
+        // 只比线性部分：平移量取决于各自作用时画布的尺寸（外层作用在内层转过之后的画布上）
+        Assert.Equal(Head(Linear(manual.Matrix(W, H))), Head(layers[0]));          // 外层 = 用户调整
+        Assert.Equal(Head(Linear(doc.AutoXform.Matrix(W, H))), Head(layers[1]));   // 内层 = 母版摆正
+    }
+
+    static double[] Linear((double a, double b, double c, double d, double e, double f) m)
+        => new[] { m.a, m.b, m.c, m.d };
+
+    static double[] Head(double[] v) => v[..4];
+
+    /// <summary>按嵌套顺序取出每层 <c>&lt;g transform="matrix(...)"&gt;</c> 的六个参数。</summary>
+    static List<double[]> Layers(string svg)
+    {
+        var list = new List<double[]>();
+        int i = 0;
+        while ((i = svg.IndexOf("<g transform=\"matrix(", i, StringComparison.Ordinal)) >= 0)
+        {
+            int a = svg.IndexOf('(', i) + 1;
+            int b = svg.IndexOf(')', a);
+            var p = svg[a..b].Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                             .Select(double.Parse).ToArray();
+            list.Add(p);
+            i = b;
+        }
+        return list;
+    }
+
     // ---------------------------------------------------------------- PNG 侧
 
     /// <summary>

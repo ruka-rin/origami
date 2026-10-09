@@ -4,8 +4,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="360"
         x:Class="Origami.Desktop.ExportDialog"
-        Title="导出" Width="420" Height="360"
-        CanResize="False" ShowInTaskbar="False"
+        Title="导出" Width="420"
+        SizeToContent="Height" CanResize="False" ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource Bgc.Chrome}">
 

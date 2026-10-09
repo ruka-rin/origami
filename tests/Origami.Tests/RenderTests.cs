@@ -146,8 +146,8 @@ public class RenderTests
         var plan = SquareOps.PlanFromMaster(master);
 
         FoldedModel fm = path == "长条"
-            ? FoldOps.FoldStrip(master, strip.Folds.Select(f => f.MvType).ToList(), orient: true)
-            : FoldOps.FoldSquare(plan, orient: false);
+            ? FoldOps.FoldStrip(master, strip.Folds.Select(f => f.MvType).ToList())
+            : FoldOps.FoldSquare(plan);
 
         Assert.NotEmpty(fm.MvMap);
         Assert.Contains(Mv.Mountain, fm.MvMap.Values);
@@ -177,8 +177,8 @@ public class RenderTests
         var plan = SquareOps.PlanFromMaster(master);
 
         FoldedModel fm = path == "长条"
-            ? FoldOps.FoldStrip(master, strip.Folds.Select(f => f.MvType).ToList(), orient: true)
-            : FoldOps.FoldSquare(plan, orient: false);
+            ? FoldOps.FoldStrip(master, strip.Folds.Select(f => f.MvType).ToList())
+            : FoldOps.FoldSquare(plan);
 
         using var img = PngIO.RenderFolded(fm.World, unit: 12, rank: fm.Rank,
                                            mvMap: null, outline: null, lw: 0,
@@ -228,7 +228,7 @@ public class RenderTests
     public void 成品SVG的上色开关有效()
     {
         var master = Master.ParseMaster(SampleMasters.Krenio);
-        var fm = FoldOps.FoldSquare(SquareOps.PlanFromMaster(master), orient: false);
+        var fm = FoldOps.FoldSquare(SquareOps.PlanFromMaster(master));
 
         string on = SvgIO.FoldedToSvg(fm.World, fm.Rank, fm.MvMap, color: true, flipY: false);
         string off = SvgIO.FoldedToSvg(fm.World, fm.Rank, null, color: false, flipY: false);
@@ -250,8 +250,8 @@ public class RenderTests
         var master = Master.ParseMaster(SampleMasters.Krenio);
         var plan = SquareOps.PlanFromMaster(master);
         var stripFm = FoldOps.FoldStrip(master,
-            Model.StripModel(master).Folds.Select(f => f.MvType).ToList(), orient: true);
-        var squareFm = FoldOps.FoldSquare(plan, orient: false);
+            Model.StripModel(master).Folds.Select(f => f.MvType).ToList());
+        var squareFm = FoldOps.FoldSquare(plan);
 
         string s1 = SvgIO.PiecesToSvg(stripFm.World, 24, 16, flipY: true);
         string q1 = SvgIO.PiecesToSvg(squareFm.World, 24, 16, flipY: false);

@@ -139,7 +139,7 @@
                    ToolTip.Tip="{Binding StatusDetail}"
                    VerticalAlignment="Center" Margin="0,0,20,0"
                    HorizontalAlignment="Left"
-                   TextTrimming="CharacterEllipsis" MinWidth="100" MaxWidth="300" />
+                   MinWidth="100" />
         <TextBlock Grid.Column="1" Text="{Binding Summary}" Foreground="{StaticResource Fg.Base}"
                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
         <TextBlock Grid.Column="2" Text="{Binding ZoomText}" Foreground="{StaticResource Fg.Muted}"
@@ -154,13 +154,13 @@
 
       <!-- 左上角：形状（长条 / 方形）。GroupName 保证两项互斥。 -->
       <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="14"
-              Classes="overlay" Padding="5" Background="#333">
-        <StackPanel Orientation="Horizontal" Spacing="0" Opacity="0.8">
-          <RadioButton x:Name="ShapeStrip" GroupName="shape"
+              Classes="overlay" Padding="5" Background="#333" Opacity="0.7">
+        <StackPanel Orientation="Horizontal" Spacing="0">
+          <RadioButton x:Name="ShapeStrip" GroupName="shape" Opacity="1.3"
                        Theme="{StaticResource SegmentOption}" Classes="ghost"
                        Margin="0,0,4,0" Content="长条"
                        IsChecked="{Binding Shape, Mode=OneWay, Converter={StaticResource ShapeToBool}, ConverterParameter=Strip}" />
-          <RadioButton x:Name="ShapeSquare" GroupName="shape"
+          <RadioButton x:Name="ShapeSquare" GroupName="shape" Opacity="1.3"
                        Theme="{StaticResource SegmentOption}" Classes="ghost"
                        Content="方形"
                        IsChecked="{Binding Shape, Mode=OneWay, Converter={StaticResource ShapeToBool}, ConverterParameter=Square}" />
@@ -169,23 +169,23 @@
 
       <!-- 右上角：内容（折痕图 / 成品 / 原子片）+ 上色开关 -->
       <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="14"
-              Classes="overlay" Padding="5" Background="#333">
-        <StackPanel Orientation="Horizontal" Spacing="0" Opacity="0.8">
-          <RadioButton x:Name="ContentCrease" GroupName="content"
+              Classes="overlay" Padding="5" Background="#333" Opacity="0.7">
+        <StackPanel Orientation="Horizontal" Spacing="0">
+          <RadioButton x:Name="ContentCrease" GroupName="content" Opacity="1.3"
                        Theme="{StaticResource SegmentOption}" Classes="ghost"
                        Margin="0,0,4,0" Content="折痕图"
                        IsChecked="{Binding Content, Mode=OneWay, Converter={StaticResource ContentToBool}, ConverterParameter=Crease}" />
-          <RadioButton x:Name="ContentFolded" GroupName="content"
+          <RadioButton x:Name="ContentFolded" GroupName="content" Opacity="1.3"
                        Theme="{StaticResource SegmentOption}" Classes="ghost"
                        Margin="0,0,4,0" Content="成品"
                        IsChecked="{Binding Content, Mode=OneWay, Converter={StaticResource ContentToBool}, ConverterParameter=Folded}" />
-          <RadioButton x:Name="ContentPieces" GroupName="content"
+          <RadioButton x:Name="ContentPieces" GroupName="content" Opacity="1.3"
                        Theme="{StaticResource SegmentOption}" Classes="ghost"
                        Content="原子片"
                        IsChecked="{Binding Content, Mode=OneWay, Converter={StaticResource ContentToBool}, ConverterParameter=Pieces}" />
           <!-- 上色开关与内容切换用竖线分隔，避免被当成同一组 -->
-          <Rectangle Width="1" Margin="8,6" Fill="{StaticResource Bdr.Hairline}" />
-          <ToggleSwitch x:Name="ColorSwitch"
+          <Rectangle Width="1" Margin="8,6" Fill="{StaticResource Bdr.Hairline}" Opacity="1.3"/>
+          <ToggleSwitch x:Name="ColorSwitch" Opacity="1.3"
                         IsChecked="{Binding IsColorOn, Mode=TwoWay}"
                         IsEnabled="{Binding CanColorize}"
                         OnContent="" OffContent=""
@@ -200,10 +200,11 @@
               Click="OnShowHelp"
               ToolTip.Tip="查看操作说明" />
 
-      <!-- 右下角：画布方向。默认半透明不抢画面，悬停才实心。 -->
+      <!-- 右下角：画布方向。只在成品与原子片视图出现（折痕图不随方向变化）。 -->
       <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="14"
-              Classes="overlay" Padding="10,8" Background="#333">
-        <StackPanel Spacing="7" Opacity="0.8">
+              Classes="overlay" Padding="10,8" Background="#333"
+              IsVisible="{Binding ShowXformPanel}">
+        <StackPanel Spacing="7">
           <StackPanel Orientation="Horizontal" Spacing="0">
             <Button Classes="dir" Content="↺" Click="OnRotateCcw"
                     IsEnabled="{Binding !Busy}" ToolTip.Tip="逆时针旋转 90°" />

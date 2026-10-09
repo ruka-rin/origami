@@ -81,38 +81,16 @@ public sealed class MainViewModel : Observable
         set
         {
             if (!Set(ref _masterText, value)) return;
-
-            // 手改母版后，字模带来的旋转次数不再对应新内容 -> 作废，
-            // 让折叠层退回按 bbox 猜（否则会把旧朝向硬套到新母版上）
-            if (value != _masterRotateSource) _masterRotate = 0;
-            _masterRotateKnown = value == _masterRotateSource;
+            // 方向信息写在母版串开头的 @ / # 标记里，跟着文本一起走 ——
+            // 手改就按新文本重新解析，不需要额外维护「来源」状态。
         }
     }
-
-    /// <summary>生成母版时写入，用来识别「用户是否手改过母版」。</summary>
-    string _masterRotateSource = "";
-
-    /// <summary>
-    /// 当前 <see cref="_masterRotate"/> 是否可信（即母版是文本生成的、没被手改过）。
-    /// <para>
-    /// ★ 折叠层要的是「rotate 有<b>没有来源</b>」，不是「值是否为 0」：
-    /// rotate=0 是一组字模（A K M N P R T X Y Z…）的<b>有效约定</b>，
-    /// 当成「无信息」就会退回 bbox 猜法把字母转躺下。
-    /// </para>
-    /// </summary>
-    bool _masterRotateKnown = true;
 
     Views.Document? _doc;
     /// <summary>当前母版对应的全流程结果；解析失败时为 null。</summary>
     public Views.Document? Document => _doc;
 
     // ---------------------------------------------------------------- 文本输入框
-
-    /// <summary>
-    /// 当前母版对应的成品旋转次数（0..3），来自字模编码。
-    /// 用户<b>手动改母版串</b>后它就不再可信 -> 置回 0 让折叠层退回按 bbox 猜。
-    /// </summary>
-    int _masterRotate;
 
     string _textInput = "";
     /// <summary>
@@ -189,10 +167,10 @@ public sealed class MainViewModel : Observable
         // 使更早的生成请求作废（哪怕它还在后台跑）
         int seq = ++_genSeq;
 
-        string master; int rotate;
+        string master;
         try
         {
-            (master, rotate) = await Task.Run(() => Origami.Core.FoldFont.TextToMasterWithRotate(raw));
+            master = await Task.Run(() => Origami.Core.FoldFont.TextToMaster(raw));
         }
         catch (Exception e)
         {
@@ -208,10 +186,7 @@ public sealed class MainViewModel : Observable
             return;
         }
 
-        // 先记下这次的母版与旋转，再赋值 —— MasterText 的 setter 会比对
-        // _masterRotateSource，手改时作废 rotate
-        _masterRotateSource = master;
-        _masterRotate = rotate;
+        // 落到母版框即生效：母版串自带方向标记，铺排/折叠/画布都会照它来
         MasterText = master;
         await RenderCurrentAsync("正在生成并渲染…");
     }
@@ -252,25 +227,10 @@ public sealed class MainViewModel : Observable
     }
 
     /// <summary>把异常消息截成能塞进状态栏的一小段；原文仍进 <see cref="StatusDetail"/>。</summary>
-    public static string Short(string message, int max = 22)
+    public static string Short(string message, int max = 15)
     {
         string one = message.Split('\n', '\r')[0].Trim();
         return one.Length <= max ? one : one[..max] + "…";
-    }
-
-    /// <summary>
-    /// 直接设定画布方向，<b>不</b>触发重渲染 —— 调用方自己负责随后渲染。
-    /// <para>用于「文本生成后把系统摆正写进画布方向」：那一步紧接着就要渲染一次，
-    /// 若走 <see cref="Xform"/> 的 setter 会白白多渲染一遍。</para>
-    /// </summary>
-    void ApplyXformSilently(CanvasTransform value)
-    {
-        if (_xform == value) return;
-        _xform = value;
-        IsXformIdentity = value.IsIdentity;
-        RaisePropertyChanged(nameof(Xform));
-        RaisePropertyChanged(nameof(XformDescription));
-        RaisePropertyChanged(nameof(CanResetXform));
     }
 
     /// <summary>
@@ -465,11 +425,14 @@ public sealed class MainViewModel : Observable
     CanvasTransform _xform = CanvasTransform.Identity;
 
     /// <summary>
-    /// 画布方向（整点旋转 + 镜像）。
+    /// <b>用户自己</b>叠的画布方向（整点旋转 + 镜像）。
     /// <para>
     /// 与其去改折叠算法的方向约定，不如在显示层把整张图转一下：同一张母版可以来回对照，
     /// 而且<b>导出直接继承这个设置</b>，导出对话框里不再问一遍。
     /// 四个方向互为闭环，转满 360° 回到原样，不存在「转乱了回不来」。</para>
+    /// <para>
+    /// 母版自带的摆正（<see cref="Views.Document.AutoXform"/>）不在里面 ——
+    /// 它只对成品与原子片生效，折痕图不跟着摆正。</para>
     /// </summary>
     public CanvasTransform Xform
     {
@@ -504,10 +467,41 @@ public sealed class MainViewModel : Observable
     /// <summary>恢复原始方向。</summary>
     public void ResetXform() => Xform = CanvasTransform.Identity;
 
-    /// <summary>当前方向的文字描述（底栏显示，便于确认导出的是什么方向）。</summary>
-    public string XformDescription => _xform.Describe();
+    /// <summary>
+    /// 当前视图<b>实际生效</b>的方向描述（方向面板里显示，便于确认导出的是什么方向）。
+    /// 折痕图不显示 —— 那个面板整体隐藏，这里返回空串只是兜底。
+    /// </summary>
+    public string XformDescription
+    {
+        get
+        {
+            if (_doc is null || SelectedTab is not { } tab) return _xform.Describe();
+            if (tab.Content == ContentKind.Crease) return "";
+
+            var auto = _doc.AutoXform;
+            if (_xform.IsIdentity)
+                return auto.IsIdentity ? "原始方向" : $"母版摆正：{auto.Describe()}";
+
+            return auto.IsIdentity
+                ? _xform.Describe()
+                : $"母版{auto.Describe()} + 自己{_xform.Describe()}";
+        }
+    }
 
     bool _isXformIdentity = true;
+
+    /// <summary>
+    /// 方向面板是否显示 —— <b>只有成品与原子片才需要</b>。
+    /// 折痕图不随方向变化，面板连同「旋转 / 镜像 / 复位」一起藏掉。
+    /// </summary>
+    public bool ShowXformPanel
+    {
+        get
+        {
+            var tab = SelectedTab;
+            return tab is not null && tab.Content != ContentKind.Crease;
+        }
+    }
 
     /// <summary>是否处于原始方向。</summary>
     public bool IsXformIdentity
@@ -544,6 +538,11 @@ public sealed class MainViewModel : Observable
         try
         {
             var r = Importer.Load(text, fileName);
+
+            // 清空文本框：它还留着上一次生成的内容，稍一触发防抖就会把刚导入的母版
+            // 覆盖回旧的那份。文本框是「输入源」，导入是「直接给结果」，两者不该同时有效。
+            _generateTimer?.Stop();
+            TextInput = "";
 
             MasterText = r.MasterText;
             Color = r.Color;                 // 文件是黑白就自动把开关关掉
@@ -614,25 +613,22 @@ public sealed class MainViewModel : Observable
 
         // 渲染序号：母版又变了就作废本次结果，避免慢的旧结果覆盖新内容
         int seq = ++_renderSeq;
-        int rot = _masterRotate;
-        bool rotKnown = _masterRotateKnown;
 
         Busy = true;
         SetStatus(busyStatus);
         try
         {
             // 铺排 + 折叠是 CPU 密集的，跑在后台以免冻结界面
-            var doc = await Task.Run(() => Views.Build(raw, rot, rotKnown));
+            var doc = await Task.Run(() => Views.Build(raw));
 
             if (seq != _renderSeq) return;      // 已被更新的请求取代
 
             _doc = doc;
             _renderedMaster = raw;      // 只有成功落地的那次才算「已渲染」
 
-            // ★ 系统摆正体现在<b>画布方向</b>上，不烘焙进几何：
-            // 右下角的翻转按钮显示的就是「最终施加的翻转」，用户能在它之上继续转，
-            // 「恢复原始方向」也才真的能回到未摆正的原始朝向。
-            ApplyXformSilently(doc.AutoXform);
+            // 系统摆正不进「用户方向」：折痕图不该跟着转，成品与原子片才叠加它。
+            // 两者在取 SVG / PNG 时按视图合成，右下角按钮始终只改用户自己那一份。
+            RaisePropertyChanged(nameof(XformDescription));
             InvalidateCaches();
 
             string svg = await Task.Run(() => Views.BuildSvg(doc, tab.Kind, Color, Xform));
@@ -668,6 +664,7 @@ public sealed class MainViewModel : Observable
         SelectedTab = tab;
         // 原子片分解本来每面一色，上色开关对它无意义
         CanColorize = tab.SupportsColor;
+        RaisePropertyChanged(nameof(ShowXformPanel));
 
         if (tab.Cached is { } cached)      // 缓存命中
         {
@@ -741,11 +738,25 @@ public sealed class MainViewModel : Observable
 
     bool _rerenderPending;
 
-    /// <summary>状态栏描述：视图 + 上色状态（当前开关处于哪一边）。</summary>
+    /// <summary>状态栏描述：视图 + 上色状态 +（成品/原子片）画布方向的来历。</summary>
     string Describe(ViewTab tab)
-        => tab.SupportsColor
-            ? $"{tab.Hint}（上色：{(IsColorOn ? "彩色" : "黑白/剪影")}）"
-            : tab.Hint;
+    {
+        var parts = new List<string> { tab.Hint };
+        if (tab.SupportsColor)
+            parts.Add($"上色：{(IsColorOn ? "彩色" : "黑白/剪影")}");
+        if (_doc is not null && tab.Content != ContentKind.Crease)
+            parts.Add(OrientationNote());
+        return string.Join(" · ", parts);
+    }
+
+    /// <summary>方向这块在状态栏说清楚：成品与原子片跟着母版标记摆正（折痕图不看方向）。</summary>
+    string OrientationNote()
+    {
+        var marks = Views.SvgMarks(_doc!);
+        return marks.Length == 0
+            ? "方向：原始朝向（母版没有标记）"
+            : $"方向：按母版标记 {marks} 摆正 = {_doc!.AutoXform.Describe()}";
+    }
 
     void SetSvg(string svg, ViewTab tab)
     {

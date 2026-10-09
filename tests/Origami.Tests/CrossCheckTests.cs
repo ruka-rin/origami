@@ -121,7 +121,7 @@ public class CrossCheckTests
     {
         var b = Get(name);
         var plan = SquareOps.PlanFromMaster(Master.ParseMaster(b.Master));
-        var fm = FoldOps.FoldSquare(plan, orient: false);
+        var fm = FoldOps.FoldSquare(plan);
 
         double flat = Geom.HalfedgeFaces(plan.Cut, plan.Fold, plan.Border)
                             .Sum(Geom.PolyArea);

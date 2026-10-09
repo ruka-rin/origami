@@ -271,16 +271,13 @@ public static class Cli
                 $"折叠成品目前只支持长条模型（kind=strip），该模型 kind={m.Kind}");
 
         var master = Model.StripModelToMaster(m);
-        var (faces, creases, _) = MasterOps.ChainFromMaster(master);
         var mv = m.Folds.Select(f => f.MvType).ToList();
-        if (mv.Count != creases.Count)
-            throw new UserError($"峰谷数 {mv.Count} != 折痕数 {creases.Count}");
+        var fm = FoldOps.FoldStrip(master, mv);
+        var (faces, creases, _) = MasterOps.ChainFromMaster(master);
+        var bad = FoldOps.VerifyLayers(creases, fm.Rank);
 
-        var (world0, _) = FoldOps.RollFold(faces, creases);
-        var rank0 = FoldOps.LayerRanks(faces.Count, creases, mv);
-        var bad = FoldOps.VerifyLayers(creases, rank0);
-
-        var fm = new FoldedModel(world0, rank0, mv, faces, creases).OrientLandscape();
+        // 反向推导出来的模型没有母版串，也就没有方向标记 —— 退回按 bbox 猜个朝向
+        fm = fm.OrientLandscape();
 
         string outDir = a.Get("o", "out");
         Directory.CreateDirectory(outDir);
@@ -391,19 +388,27 @@ public static class Cli
         Console.WriteLine($"方形 {SvgIO.Describe(sq)}");
         FoldSquareOut(plan, outDir, "折叠成品_方形CP", foldUnit);
 
-        // 折叠成品（长条顺次折）
-        var (faces, creases, _) = MasterOps.ChainFromMaster(master);
+        // 折叠成品（长条顺次折）。方向由母版自带的 @ / # 标记驱动，直接施加到画布上
         var mv = strip.Folds.Select(f => f.MvType).ToList();
-        var (world0, _) = FoldOps.RollFold(faces, creases);
-        var rank0 = FoldOps.LayerRanks(faces.Count, creases, mv);
-        var bad = FoldOps.VerifyLayers(creases, rank0);
-        var fm = new FoldedModel(world0, rank0, mv, faces, creases).OrientLandscape();
+        var fm = FoldOps.FoldStrip(master, mv);
+        var (faces, creases, _) = MasterOps.ChainFromMaster(master);
+        var bad = FoldOps.VerifyLayers(creases, fm.Rank);
+        var xf = master.Marks.Canvas;
 
         WriteText(Path.Combine(outDir, "折叠成品.svg"),
-                  SvgIO.FoldedToSvg(fm.World, fm.Rank, null, mv, unit: foldUnit, color: true, flipY: true));
-        WritePng(Path.Combine(outDir, "折叠成品.png"),
-                 PngIO.RenderFolded(fm.World, unit: foldUnit, rank: fm.Rank, mvSeq: mv));
-        WritePng(Path.Combine(outDir, "原子片分解.png"), PngIO.RenderPieces(fm.World, foldUnit));
+                  SvgTransform.Apply(
+                      SvgIO.FoldedToSvg(fm.World, fm.Rank, null, mv, unit: foldUnit, color: true, flipY: true),
+                      xf));
+        using (var r = PngIO.RenderFolded(fm.World, unit: foldUnit, rank: fm.Rank, mvSeq: mv))
+        {
+            r.Transform(xf);
+            WritePng(Path.Combine(outDir, "折叠成品.png"), r);
+        }
+        using (var r = PngIO.RenderPieces(fm.World, foldUnit))
+        {
+            r.Transform(xf);
+            WritePng(Path.Combine(outDir, "原子片分解.png"), r);
+        }
 
         var (bx0, by0, bx1, by1) = fm.Bbox();
         double areaDiff = Math.Abs(faces.Sum(Geom.PolyArea) - fm.World.Sum(Geom.PolyArea));
@@ -457,12 +462,14 @@ public static class Cli
 
         var m = Master.ParseMaster(master);
         var plan = SquareOps.PlanFromMaster(m);
-        var fm = FoldOps.FoldSquare(plan, orient: false);
+        var fm = FoldOps.FoldSquare(plan);
         var (x0, y0, x1, y1) = Geom.PolyBbox(fm.World);
+        var (sx, sy) = m.Marks.Canvas.SizeOf(x1 - x0, y1 - y0);
 
         Console.WriteLine($"文本: {text.Replace("\n", " / ")}");
         Console.WriteLine($"母版: {m.NCell} 格  竖折痕 {m.Pipes.Count} 条  ->  方形 {plan.N}×{plan.N}  折痕 {plan.Fold.Count} 条");
-        Console.WriteLine($"成品: {x1 - x0:0.#}×{y1 - y0:0.#} 格");
+        Console.WriteLine($"标记: {(m.Marks.IsNone ? "无" : m.Marks.Prefix + "  (" + m.Marks.Canvas.Describe() + ")")}");
+        Console.WriteLine($"成品: {sx:0.#}×{sy:0.#} 格（含 {m.Marks.Prefix}摆正）");
         Console.WriteLine();
         Console.WriteLine(master);
 
@@ -492,51 +499,62 @@ public static class Cli
         var plan = SquareOps.PlanFromMaster(master);
         var squareModel = Model.SquareModel(plan);
         var mv = stripModel.Folds.Select(f => f.MvType).ToList();
-        var stripFold = FoldOps.FoldStrip(master, mv, orient: true);
-        var squareFold = FoldOps.FoldSquare(plan, orient: false);
+        var stripFold = FoldOps.FoldStrip(master, mv);
+        var squareFold = FoldOps.FoldSquare(plan);
+        // 方向标记来自母版串：预览与导出用同一个变换，屏幕上什么样文件里就什么样
+        var mxf = master.Marks.Canvas;
+
+        // 成品视图统一套上母版自带的画布方向（折痕图是纸面本身，不跟着转）
+        (string Svg, Func<Raster> Png) Folded(string svg, Func<Raster> png)
+            => (SvgTransform.Apply(svg, mxf), () => { var r = png(); r.Transform(mxf); return r; });
 
         // 视图名 -> (SVG 文本, PNG 渲染器)
         (string Svg, Func<Raster> Png) pick = view switch
         {
+            // 折痕图不随母版摆正（只记标记），与界面一致
             "长条" => (
-                SvgIO.ModelToSvg(stripModel, unit, unit * 0.58, 1.2 * scale, color: !plain),
+                SvgTransform.Stamp(
+                    SvgIO.ModelToSvg(stripModel, unit, unit * 0.58, 1.2 * scale, color: !plain),
+                    master.Marks.Prefix),
                 () => (PngIO.RenderCreaseBlack(stripModel, unit * scale,
                                        unit * scale * 0.58, lw: 1.2 * scale))),
 
             "方形" => (
-                SvgIO.ModelToSvg(squareModel, unit, unit, 1.6 * scale, color: !plain),
+                SvgTransform.Stamp(
+                    SvgIO.ModelToSvg(squareModel, unit, unit, 1.6 * scale, color: !plain),
+                    master.Marks.Prefix),
                 () => (PngIO.RenderCreaseBlack(squareModel, unit * scale,
                                        unit * scale, lw: 1.6 * scale))),
 
-            "长条成品" => (
+            "长条成品" => Folded(
                 SvgIO.FoldedToSvg(stripFold.World, stripFold.Rank, plain ? null : stripFold.MvMap,
                                   mvSeq: null, unit: foldUnit, color: !plain, flipY: true),
-                () => (PngIO.RenderFolded(stripFold.World, foldUnit * scale,
+                () => PngIO.RenderFolded(stripFold.World, foldUnit * scale,
                                        foldUnit * scale * 0.65, rank: stripFold.Rank,
                                        mvMap: plain ? null : stripFold.MvMap,
                                        lw: plain ? 0 : 1.2 * scale,
                                        supersample: scale >= 3 ? 4 : 2, flipY: true,
-                                       forceFill: plain ? Rgb.Black : null))),
+                                       forceFill: plain ? Rgb.Black : null)),
 
-            "方形成品" => (
+            "方形成品" => Folded(
                 SvgIO.FoldedToSvg(squareFold.World, squareFold.Rank, plain ? null : squareFold.MvMap,
                                   mvSeq: null, unit: foldUnit, color: !plain, flipY: false),
-                () => (PngIO.RenderFolded(squareFold.World, foldUnit * scale,
+                () => PngIO.RenderFolded(squareFold.World, foldUnit * scale,
                                        foldUnit * scale * 0.65, rank: squareFold.Rank,
                                        mvMap: plain ? null : squareFold.MvMap,
                                        lw: plain ? 0 : 1.2 * scale,
                                        supersample: scale >= 3 ? 4 : 2, flipY: false,
-                                       forceFill: plain ? Rgb.Black : null))),
+                                       forceFill: plain ? Rgb.Black : null)),
 
-            "长条原子片" => (
+            "长条原子片" => Folded(
                 SvgIO.PiecesToSvg(stripFold.World, foldUnit, foldUnit * 0.6, flipY: true),
-                () => (PngIO.RenderPieces(stripFold.World, foldUnit * scale,
-                                       foldUnit * scale * 0.6, flipY: true))),
+                () => PngIO.RenderPieces(stripFold.World, foldUnit * scale,
+                                       foldUnit * scale * 0.6, flipY: true)),
 
-            "方形原子片" => (
+            "方形原子片" => Folded(
                 SvgIO.PiecesToSvg(squareFold.World, foldUnit, foldUnit * 0.6, flipY: false),
-                () => (PngIO.RenderPieces(squareFold.World, foldUnit * scale,
-                                       foldUnit * scale * 0.6, flipY: false))),
+                () => PngIO.RenderPieces(squareFold.World, foldUnit * scale,
+                                       foldUnit * scale * 0.6, flipY: false)),
 
             _ => throw new UserError($"未知视图「{view}」"),
         };

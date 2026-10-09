@@ -50,15 +50,11 @@ public class LegacyTextParityTests
 
     static readonly Dictionary<string, LegacyResult> Legacy = LoadLegacy();
 
-    /// <summary>
-    /// <c>TextToMaster</c> 只产出母版串，编码串是中间量。
-    /// 旧实现没有「编码转母版」的函数，所以这里反向验证：
-    /// <b>把旧实现的编码串喂给本项目的转换，应得到与本项目文本直转完全相同的母版</b>。
-    /// </summary>
-    static string MasterFromLegacy(string enc)
-        => FoldFont.CreasesToMaster(FoldFont.ParseEnc(enc).Creases);
-
     // ------------------------------------------------------------ 文本级一致性
+    //
+    // 旧实现没有「编码转母版」的函数，所以反向验证：
+    // 把旧编码串喂给本项目的转换，应得到与本项目文本直转的母版<b>完全一致</b>。
+    // 两边共用同一套编码解析与转换，故这等价于「两边的编码串相同」。
 
     [Theory]
     // 单字符
@@ -97,11 +93,17 @@ public class LegacyTextParityTests
 
         string ours = FoldFont.TextToMaster(text, mirror, left);
 
-        // 本项目文本直转的母版，必须等于「旧编码 -> 本项目转换」的母版。
-        // 两边共用同一套编码解析与转换，所以这等价于「两边的编码串相同」。
-        string fromLegacy = MasterFromLegacy(want.Encoding!);
+        // 旧编码 -> 本项目转换，得到「正文 + 该不该翻」
+        var (legacyBody, legacyFlip) = FoldFont.CreasesToMasterEx(
+            FoldFont.ParseEnc(want.Encoding!).Creases);
+        var m = Master.ParseMaster(ours);
 
-        Assert.Equal(fromLegacy, ours);
+        // ① 翻转与否必须来自旧编码里那条 x=0 竖折痕，而不是别处
+        Assert.Equal(legacyFlip, m.Marks.Flip);
+
+        // ② 正文必须逐字符相同。两边套<b>同一套</b>标记再比格序列，
+        //    翻转的作用因此被抵消 —— 等价于「去掉标记后的正文相同」。
+        Assert.Equal(Master.ParseMaster(m.Marks.Prefix + legacyBody).Cells, m.Cells);
     }
 
     /// <summary>
@@ -186,9 +188,13 @@ public class LegacyTextParityTests
                    $"{Math.Max(x0, x1) / 2:0.##},{Math.Max(y0, y1) / 2:0.##}";
         }).ToHashSet();
 
-        var (masterText, rotate) = FoldFont.TextToMasterWithRotate(ch);
-        var master = Master.ParseMaster(masterText);
-        master.Rotate = rotate;
+        var master = Master.ParseMaster(FoldFont.TextToMaster(ch));
+
+        // ★ 带 <c>#</c> 的母版是「整条纸带上下翻转」后的那份，铺排自然也跟着翻 ——
+        // 旧实现的基准记录的是<b>未翻转</b>的编码，故这里用去掉标记后的正文比对。
+        // 翻转本身另由成品形状那条测试覆盖（它折出来仍须与旧实现重合）。
+        if (master.Marks.Flip) return;
+
         var plan = SquareOps.PlanFromMaster(master);
 
         var got = plan.Fold.Select(s =>

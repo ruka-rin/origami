@@ -152,7 +152,6 @@ public class LegacyParityTests
     /// 少一条就意味着某个折痕在转换中丢了。
     /// </para>
     /// <para>
-    /// <para>
     /// ★ 母版的<b>格数</b>不能与编码宽度直接相等：编码尾部的 <c>_</c> 前进两格
     /// 但不留折痕，那一段在母版里就是没有折痕的素格（这正是「末尾多素格」
     /// 那次修复的判据）。同理 <b>x=0 的竖折痕</b>也表达不了 ——
@@ -183,8 +182,9 @@ public class LegacyParityTests
             var body = creases.Skip(1).Take(creases.Count - 2);
 
             int diagonals = body.Count(c => c.Xb != c.Xt);
-            // x=0 的竖折痕母版表达不了（pipes 取值只能是 1..格数），按规则丢弃
-            int verticals = body.Count(c => c.Xb == c.Xt && c.Xb != 0);
+            // 纸带两端的竖折痕（x=0 与 x=width）母版表达不了，按规则丢弃：
+            // 前者换个地方记（母版开头的 # 与补偿旋转），后者与末尾哨兵重合
+            int verticals = body.Count(c => c.Xb == c.Xt && c.Xb != 0 && c.Xb != creases[^1].Xb);
 
             var m = Master.ParseMaster(FoldFont.CreasesToMaster(creases));
             var back = m.CreasesInOrder();

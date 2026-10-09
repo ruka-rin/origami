@@ -45,6 +45,9 @@ public static class Importer
 
         // ---- SVG ----
         ColorMode color = DetectColor(text);
+        // 折痕图不带方向变换，但根元素上记着母版的 @ / # 标记 —— 还原母版时要补回去，
+        // 否则导入一次就把方向信息丢了，成品会歪
+        string marks = ReadMarks(text);
 
         var model = SvgIO.SvgToModel(text, strict: false);
 
@@ -67,7 +70,7 @@ public static class Importer
             case "strip":
             {
                 var master = Model.StripModelToMaster(model);
-                return new ImportResult(master.Text.Trim(), ViewKind.Strip, color, null);
+                return new ImportResult(marks + master.Text.Trim(), ViewKind.Strip, color, null);
             }
 
             case "square":
@@ -82,13 +85,24 @@ public static class Importer
                       "已取第一个能正向复现原方形的候选，可放心继续操作。"
                     : null;
 
-                return new ImportResult(r.Master.Text.Trim(), ViewKind.Square, color, warn);
+                return new ImportResult(marks + r.Master.Text.Trim(), ViewKind.Square, color, warn);
             }
 
             default:
                 throw new FormatException(
                     $"「{fileName}」的 data-kind={model.Kind}，不是折痕图（应为 strip 或 square）。");
         }
+    }
+
+    /// <summary>读回根元素上的 <c>data-marks</c>；只认 <c>@</c> 与 <c>#</c>，其余一律丢弃。</summary>
+    static string ReadMarks(string svg)
+    {
+        int i = svg.IndexOf("data-marks=\"", StringComparison.Ordinal);
+        if (i < 0) return "";
+        int a = i + "data-marks=\"".Length;
+        int b = svg.IndexOf('"', a);
+        if (b <= a) return "";
+        return string.Concat(svg[a..b].Where(c => c is Master.RotateMark or Master.FlipMark));
     }
 
     /// <summary>看内容判断是不是 SVG（而不是靠扩展名 —— 扩展名可以撒谎）。</summary>

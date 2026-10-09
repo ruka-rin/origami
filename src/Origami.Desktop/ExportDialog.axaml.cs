@@ -8,8 +8,9 @@ namespace Origami.Desktop;
 /// <summary>
 /// 导出选项对话框：格式（SVG/PNG）、配色（彩色/黑白）、PNG 分辨率。
 /// <para>
-/// 分辨率只对 PNG 有意义 —— SVG 是矢量，不存在分辨率概念，
-/// 所以选 SVG 时那一整块会被隐藏，而不是灰着放在那里让人以为有影响。</para>
+/// 窗口高度跟随内容（<c>SizeToContent="Height"</c>）：配色与分辨率两块会按所选
+/// 视图/格式整块隐藏，固定高度会留出一块空白，而按隐藏项手改高度又要靠魔法数字
+/// 和每个分支对齐。</para>
 /// </summary>
 public partial class ExportDialog : Window
 {
@@ -44,18 +45,10 @@ public partial class ExportDialog : Window
         ColorRadio.IsChecked = currentColor == ColorMode.Peaks;
         PlainRadio.IsChecked = currentColor == ColorMode.Plain;
 
-        // 原子片分解本来每面一色，配色选项对它无意义
-        bool canColor = tab?.SupportsColor ?? true;
-        if (!canColor)
+        // 原子片分解本来每面一色，配色选项对它无意义 —— 整块隐藏，高度由窗口自己收
+        if (tab?.SupportsColor == false)
         {
-            //ColorRadio.IsEnabled = canColor;
-            //PlainRadio.IsEnabled = canColor;
-            ColorPanel.IsVisible = canColor;
-            Height -= 70;
-        }
-        
-        if (!canColor)
-        {
+            ColorPanel.IsVisible = false;
             ColorRadio.IsChecked = true;          // 只是让取值合法
             PlainRadio.IsChecked = false;
         }
@@ -73,7 +66,7 @@ public partial class ExportDialog : Window
     }
 
     /// <summary>
-    /// 按所选格式切换「分辨率」与「无分辨率」的说明区块。
+    /// 按所选格式切换「分辨率」与「矢量无分辨率」两块，二者必居其一。
     /// <para>
     /// 判据用「SVG 被选中则无分辨率」而非「PNG 是否选中」——
     /// 两项同时为 true 时（初始化阶段、或分组未生效的环境）后者会误判成 PNG。
@@ -84,6 +77,7 @@ public partial class ExportDialog : Window
     {
         bool svg = SvgRadio.IsChecked == true;
 
+        // 整块隐藏：留着标题或灰着的控件都会让人以为分辨率对 SVG 有影响
         ScalePanel.IsVisible = !svg;
         VectorNote.IsVisible = svg;
     }

@@ -343,13 +343,18 @@ public class FoldTests
     public void 折叠成品可摆正为横向()
     {
         var m = Master.ParseMaster("/....|../\\.|.//.\\./.../\\./.");
-        var fm = FoldOps.FoldStrip(m, MasterOps.DefaultMv(48));
+        var fm = FoldOps.FoldStrip(m, MasterOps.DefaultMv(48)).OrientLandscape();
         var (x0, y0, x1, y1) = fm.Bbox();
         Assert.True((x1 - x0) >= (y1 - y0) - 1e-9, "orient_landscape 后应为宽 >= 高");
     }
 
     /// <summary>
     /// 45° 对角纸带的朝向不该随格数在两个方向之间跳变。
+    /// <para>
+    /// 手工输入、不带 <c>@</c>/<c>#</c> 标记的母版串没有任何方向信息，
+    /// 成品就停在原始朝向，此时只有 <c>OrientLandscape</c> 这一条兜底路 ——
+    /// 本测试守的就是它。由母版标记驱动的摆正另有测试覆盖。
+    /// </para>
     /// <para>
     /// 回归：<c>OrientLandscape</c> 曾用 bbox 宽高比判断是否旋转，而对角纸带的
     /// bbox 恰好是正方形 N×N，判定在边界处随机翻转 —— 于是母版从
@@ -366,7 +371,7 @@ public class FoldTests
     public void 对角纸带的朝向不随格数跳变(int n)
     {
         var m = Master.ParseMaster(new string('\\', n));
-        var fm = FoldOps.FoldStrip(m, MasterOps.DefaultMv(m.NCell));
+        var fm = FoldOps.FoldStrip(m, MasterOps.DefaultMv(m.NCell)).OrientLandscape();
 
         var (x0, y0, x1, y1) = fm.Bbox();
         double w = x1 - x0, h = y1 - y0;
@@ -388,7 +393,7 @@ public class FoldTests
         for (int n = 1; n <= 8; n++)
         {
             var m = Master.ParseMaster(new string('\\', n));
-            var fm = FoldOps.FoldStrip(m, MasterOps.DefaultMv(m.NCell));
+            var fm = FoldOps.FoldStrip(m, MasterOps.DefaultMv(m.NCell)).OrientLandscape();
             var (x0, y0, x1, y1) = fm.Bbox();
             double w = x1 - x0;
 

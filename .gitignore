@@ -19,3 +19,5 @@ coverage*.xml
 *.bak
 Thumbs.db
 .DS_Store
+## 本地导出产物
+out/

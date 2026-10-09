@@ -128,7 +128,7 @@ public static class FoldFont
         return new EncodedLetter(creases, x, rotate);
     }
 
-    /// <summary>一段文本 -&gt; 折痕母版串。</summary>
+    /// <summary>一段文本 -&gt; 带方向标记的母版串。</summary>
     /// <param name="text">普通文本，换行分行；字库里没有的字符会被跳过。</param>
     /// <param name="mirror">
     /// 奇数行是否<b>镜像</b>；否则改为<b>反转</b>字符顺序。两者都能让多行沿长条
@@ -139,22 +139,38 @@ public static class FoldFont
     /// 否则每行首字符用「词首」变体，起始折痕由字模自带。
     /// </param>
     public static string TextToMaster(string text, bool mirror = false, bool left = false)
-        => TextToMasterWithRotate(text, mirror, left).Master;
+        => PlanFromText(text, mirror, left).Master;
 
     /// <summary>
-    /// 文本 -&gt; 母版，<b>并给出成品该转多少个 90°</b>。
-    /// <para>
-    /// <paramref name="Rotate"/> 即字模编码里的 <c>@</c> 计数，由第一个字母决定
-    /// ——旧实现用它「一次到位」地摆正成品，不靠 bbox 猜朝向。
-    /// </para>
+    /// 一段文本 -&gt; 带方向标记的母版串，并保留字模的原始信息便于核对。
+    /// <paramref name="Rotate"/> 是编码里的 <c>@</c> 计数（由第一个字母决定），
+    /// <paramref name="Flip"/> 表示编码含 x=0 竖折痕（旧实现拿它把成品左右翻转）。
     /// </summary>
-    public static (string Master, int Rotate) TextToMasterWithRotate(
+    public static (string Master, int Rotate, bool Flip) PlanFromText(
         string text, bool mirror = false, bool left = false)
+    {
+        var (body, rotate, flip) = EncodeText(text, mirror, left);
+        if (body.Length == 0) return ("", 0, false);
+        return (MasterMarkOf(rotate, flip).Prefix + body, rotate, flip);
+    }
+
+    /// <summary>
+    /// 字模信息 -&gt; 方向标记。★ 记翻转时要<b>多转半圈</b>（<c>+2</c>）：
+    /// <c>#</c> 是上下翻转，x=0 折痕做的是左右翻转，二者相差一个 180°
+    /// （<c>左右 = 上下 ∘ 转180°</c>）。具体取值由 <c>LegacyMarkParityTests</c>
+    /// 逐字模钉住 —— 它与编码里的 <c>@</c> 个数并不是同一个量。
+    /// </summary>
+    static MasterMarks MasterMarkOf(int rotate, bool flip)
+        => new(flip ? (rotate + 2) % 4 : rotate % 4, flip);
+
+    /// <summary>走完「行翻转 / 行间转折符 / 左起补折痕」这一遍，只产出<b>不带标记</b>的正文。</summary>
+    static (string Master, int Rotate, bool Flip) EncodeText(
+        string text, bool mirror, bool left)
     {
         var lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n').ToList();
         while (lines.Count > 0 && lines[0].Length == 0) lines.RemoveAt(0);
         while (lines.Count > 0 && lines[^1].Length == 0) lines.RemoveAt(lines.Count - 1);
-        if (lines.Count == 0) return ("", 0);
+        if (lines.Count == 0) return ("", 0, false);
 
         int parity = left ? 1 : 0;
         var sb = new System.Text.StringBuilder();
@@ -207,7 +223,19 @@ public static class FoldFont
         }
 
         var parsed = ParseEnc(enc, false);
-        return (CreasesToMaster(parsed.Creases), parsed.Rotate);
+        var (body, flip) = CreasesToMasterEx(parsed.Creases);
+        return (body, parsed.Rotate, flip);
+    }
+
+    /// <summary>
+    /// 文本 -&gt; 母版，并保留字模的 rotate 与翻转信息（核对旧参考实现时用）。
+    /// <para>成品该怎么摆已经写进返回的母版串开头，见 <see cref="PlanFromText"/>。</para>
+    /// </summary>
+    public static (string Master, int Rotate) TextToMasterWithRotate(
+        string text, bool mirror = false, bool left = false)
+    {
+        var (master, rotate, _) = PlanFromText(text, mirror, left);
+        return (master, rotate);
     }
 
     /// <summary>字模编码开头的 <c>_</c> / 空格是「对齐余量」，不计入折叠。</summary>
@@ -221,16 +249,18 @@ public static class FoldFont
         return new string(chars);
     }
 
-    /// <summary>折痕序列 -&gt; 母版串（<see cref="Layout.MasterToCreases"/> 的逆运算）。</summary>
+    /// <summary>
+    /// 折痕序列 -&gt; 母版正文，并报出「编码是否带 x=0 竖折痕」。
+    /// x=0 这条母版格式表达不了（<c>pipes</c> 没有「第 0 格之前」的位置），
+    /// 由 <see cref="MasterMarks"/> 记在开头，正文保持<b>纯粹的折痕</b>。
+    /// </summary>
     /// <remarks>
-    /// 竖折痕是<b>插进去</b>而不是替换格子：母版串里 <c>|</c> 不占格位，
-    /// <c>p=k</c> 表示「第 k 格<b>之前</b>有一条竖折痕」，而第 k-1 格的斜折痕
-    /// 落在 x=2(k-1) 上、竖折痕落在 x=2k 上，两者并不冲突。
-    /// 同理 x=0 的竖折痕要丢掉 —— 母版格式里 <c>pipes</c> 取值只能是 1..格数。
+    /// 竖折痕是<b>插进去</b>而不是替换格子：母版串里 <c>|</c> 不占格位。
     /// </remarks>
-    public static string CreasesToMaster(IReadOnlyList<(int Xb, int Xt)> creases)
+    public static (string Master, bool Flip) CreasesToMasterEx(
+        IReadOnlyList<(int Xb, int Xt)> creases)
     {
-        if (creases.Count < 2) return "";
+        if (creases.Count < 2) return ("", false);
 
         // ★ 格数就是<b>编码占用的总宽度</b>，<b>不</b>裁前导也<b>不</b>裁尾部。
         //
@@ -244,13 +274,14 @@ public static class FoldFont
         // 合并成同一个面片，所以保留全部 12 格才能复现旧实现的 6 片结构。
         // 曾经用「最后一条折痕」定格数、又裁掉前导空白，等于把首尾两块
         // 空白片扔了 —— V 只剩下中间的 4 格，折出来自然只有半个字母。
-        int bySentinel = creases[^1].Xb / 2;
-        int ncell = bySentinel;
-        if (ncell <= 0) return "";
+        int width = creases[^1].Xb;
+        int ncell = width / 2;
+        if (ncell <= 0) return ("", false);
 
         var cells = new char[ncell];
         Array.Fill(cells, '.');
         var pipes = new HashSet<int>();
+        bool flip = false;
 
         // 跳过首尾哨兵
         for (int i = 1; i < creases.Count - 1; i++)
@@ -259,13 +290,10 @@ public static class FoldFont
 
             if (xb == xt)
             {
-                // ★ p=0 必须保留。x=0 处的竖折痕是纸带起点端的一道<b>真实的折</b>：
-                // 它切出的面片宽度为零（L/68S 等字模的 creases 里就有一条 (0,0)），
-                // 平面剖分产生不出零宽面片，但那条反射线会镜像其后<b>所有</b>面片
-                // —— 等价于整个成品沿 x=0 左右翻转。
-                // 曾经按「pipes 只能取 1..格数」把它丢弃，于是 L / 68S 少了这次
-                // 镜像，与旧实现的重合度只有 0.62（V/S/SOS 这类没有 x=0 折痕的
-                // 字模则是 0.998）。折叠层会据「pipes 含 0」补上这次镜像。
+                // 落在纸带两端（x=0 或 x=width）的竖折痕不入正文：
+                // 前者是整条纸带的一次镜像（见 Flip），后者与末尾哨兵重合。
+                if (xt == 0) { flip = true; continue; }
+                if (xt == width) continue;
                 if (xt % 2 == 0) pipes.Add(xt / 2);
                 continue;
             }
@@ -281,6 +309,10 @@ public static class FoldFont
             if (pipes.Contains(i)) sb.Append('|');
             if (i < ncell) sb.Append(cells[i]);
         }
-        return sb.ToString();
+        return (sb.ToString(), flip);
     }
+
+    /// <summary>折痕序列 -&gt; 母版正文（不含开头标记）。</summary>
+    public static string CreasesToMaster(IReadOnlyList<(int Xb, int Xt)> creases)
+        => CreasesToMasterEx(creases).Master;
 }

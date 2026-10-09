@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 
+using Origami.Core;
 using Origami.Desktop;
 using Xunit;
 
@@ -274,6 +275,7 @@ public class UiSmokeTests
         dlg.Show();
 
         dlg.SvgRadio.IsChecked = true;
+        // 分辨率整块消失（标题与下拉一起），换之以「矢量无分辨率」的说明
         Assert.False(dlg.ScalePanel.IsVisible);
         Assert.True(dlg.VectorNote.IsVisible);
 
@@ -318,6 +320,7 @@ public class ViewModelTests
     public async Task 所有视图都能构建()
     {
         var vm = new MainViewModel();
+        vm.MasterText = SampleMasters.Krenio;      // 不依赖 DEBUG 才有的初值
         await vm.RebuildAsync();
 
         // 2 形状 × 3 内容 = 6 种组合，逐一切过去都必须能产出图
@@ -338,6 +341,7 @@ public class ViewModelTests
     public async Task 维度组合解析出正确视图()
     {
         var vm = new MainViewModel();
+        vm.MasterText = SampleMasters.Krenio;      // 不依赖 DEBUG 才有的初值
         await vm.RebuildAsync();
 
         vm.Shape = ShapeKind.Square;
@@ -362,10 +366,88 @@ public class ViewModelTests
     }
 
     /// <summary>旋转后「恢复原始方向」必须可用，复位后必须禁用。</summary>
+    /// <summary>
+    /// 切视图是 <c>_ = SelectViewAsync(...)</c>（故意不阻塞 UI），<see cref="Settle"/>
+    /// 只等得到 Busy，状态栏文字可能还没落地 —— 这里按条件轮询。
+    /// </summary>
+    static async Task Until(Func<bool> cond)
+    {
+        for (int i = 0; i < 300 && !cond(); i++) await Task.Delay(10);
+    }
+
+    /// <summary>
+    /// 方向只在<b>成品与原子片</b>上有意义：面板出现、状态栏说明摆正的来历；
+    /// 折痕图不参与方向 —— 面板整个隐藏，状态栏也不显示方向状态。
+    /// </summary>
+    [AvaloniaFact]
+    public async Task 方向面板只在成品与原子片出现()
+    {
+        var vm = new MainViewModel();
+        vm.TextInput = "G";
+        await Task.Delay(400);                 // 等文本框的防抖生成跑完，免得它跟后面抢
+        await Settle(vm);
+        Assert.Contains("@@#", vm.MasterText);
+
+        vm.Content = ContentKind.Folded;
+        await Settle(vm);
+        await Until(() => vm.StatusDetail.Contains("@@#"));
+        Assert.True(vm.ShowXformPanel, $"未显示方向面板：{vm.Status}");
+        Assert.Contains("母版摆正", vm.XformDescription);
+        Assert.Contains("@@#", vm.StatusDetail);
+
+        vm.RotateCw();
+        await Settle(vm);
+        Assert.Contains("母版", vm.XformDescription);
+        Assert.Contains("自己", vm.XformDescription);
+
+        vm.Content = ContentKind.Pieces;
+        await Settle(vm);
+        Assert.True(vm.ShowXformPanel);
+
+        vm.Content = ContentKind.Crease;
+        await Settle(vm);
+        await Until(() => !vm.ShowXformPanel);
+        Assert.False(vm.ShowXformPanel);
+        Assert.Equal("", vm.XformDescription);
+        Assert.DoesNotContain("方向", vm.StatusDetail);
+    }
+
+    /// <summary>导入要清空文本框：否则残留内容会被防抖重新生成，覆盖掉刚导入的母版。</summary>
+    [AvaloniaFact]
+    public async Task 导入会清空文本框()
+    {
+        var vm = new MainViewModel();
+        vm.TextInput = "G";
+        await Task.Delay(400);
+        await Settle(vm);
+
+        await vm.ImportAsync(SampleMasters.Krenio, "krenio.txt");
+        await Settle(vm);
+
+        Assert.Equal("", vm.TextInput);
+        Assert.Equal(SampleMasters.Krenio, vm.MasterText);
+    }
+
+    /// <summary>
+    /// 导入折痕图要带回方向标记 —— 标记只写在 SVG 的 <c>data-marks</c> 里，
+    /// 丢了它成品就会歪，而母版串看上去还是「合法」的。
+    /// </summary>
+    [Theory]
+    [InlineData("G", "@@#")] [InlineData("S", "@@@")] [InlineData("A", "")]
+    public void 导入折痕图带回方向标记(string ch, string marks)
+    {
+        var doc = Views.Build(FoldFont.TextToMaster(ch));
+        string svg = Views.BuildSvg(doc, ViewKind.Strip, ColorMode.Peaks);
+
+        var r = Importer.Load(svg, "strip.svg");
+        Assert.Equal(marks, Master.ParseMaster(r.MasterText).Marks.Prefix);
+    }
+
     [AvaloniaFact]
     public async Task 恢复方向按钮状态随方向变化()
     {
         var vm = new MainViewModel();
+        vm.MasterText = SampleMasters.Krenio;      // 不依赖 DEBUG 才有的初值
         await vm.RebuildAsync();
 
         Assert.True(vm.IsXformIdentity);
@@ -389,6 +471,7 @@ public class ViewModelTests
     public async Task 镜像也算非原始方向()
     {
         var vm = new MainViewModel();
+        vm.MasterText = SampleMasters.Krenio;      // 不依赖 DEBUG 才有的初值
         await vm.RebuildAsync();
 
         vm.ToggleMirrorX();
@@ -405,6 +488,7 @@ public class ViewModelTests
     public async Task 原子片视图禁用上色()
     {
         var vm = new MainViewModel();
+        vm.MasterText = SampleMasters.Krenio;      // 不依赖 DEBUG 才有的初值
         await vm.RebuildAsync();
 
         // 原子片不支持上色
@@ -422,6 +506,7 @@ public class ViewModelTests
     public async Task 清空母版回到空状态()
     {
         var vm = new MainViewModel();
+        vm.MasterText = SampleMasters.Krenio;      // 不依赖 DEBUG 才有的初值
         await vm.RebuildAsync();
 
         vm.MasterText = "";
@@ -449,6 +534,7 @@ public class ViewModelTests
     public async Task 导出SVG遵循所选配色()
     {
         var vm = new MainViewModel();
+        vm.MasterText = SampleMasters.Krenio;      // 不依赖 DEBUG 才有的初值
         await vm.RebuildAsync();
 
         var tab = vm.ViewTabs.First(t => t.Kind == ViewKind.Strip);
@@ -483,6 +569,7 @@ public class ViewModelTests
     public async Task 导出PNG遵循所选倍率()
     {
         var vm = new MainViewModel();
+        vm.MasterText = SampleMasters.Krenio;      // 不依赖 DEBUG 才有的初值
         await vm.RebuildAsync();
 
         var tab = vm.ViewTabs.First(t => t.Kind == ViewKind.Strip);

@@ -199,7 +199,7 @@ public class RegressionTests
     {
         var master = Master.ParseMaster(SampleMasters.Krenio);
         var mv = Model.StripModel(master).Folds.Select(f => f.MvType).ToList();
-        var fm = FoldOps.FoldStrip(master, mv, orient: false);
+        var fm = FoldOps.FoldStrip(master, mv);
 
         Assert.NotEmpty(fm.MvSeq);
         Assert.Equal(fm.MvSeq.Count, fm.Rotate90(1).MvSeq.Count);
@@ -212,7 +212,7 @@ public class RegressionTests
     {
         var master = Master.ParseMaster(SampleMasters.Krenio);
         var mv = Model.StripModel(master).Folds.Select(f => f.MvType).ToList();
-        var fm = FoldOps.FoldStrip(master, mv, orient: false);
+        var fm = FoldOps.FoldStrip(master, mv);
 
         var back = fm.Rotate90(1).Rotate90(1).Rotate90(1).Rotate90(1);
         Assert.Equal(fm.World.Count, back.World.Count);

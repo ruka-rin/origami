@@ -65,84 +65,11 @@ public class LegacyLetterParityTests
 
     // ---------------------------------------------------------------- 形状重合度
 
-    const int Grid = 72;
-
     /// <summary>
-    /// 把多边形集合栅格化成 <see cref="Grid"/>² 布尔掩码（归一化到单位框）。
-    /// </summary>
-    /// <param name="flipY">
-    /// 输入是否 y 向上。本项目折叠结果是数学坐标（y 向上），要先翻成屏幕
-    /// 方向（y 向下）才能与旧实现的坐标比 —— <b>翻转要作用在多边形上</b>，
-    /// 而不是作用在采样点上，否则多边形本身的方向没变，掩码会错。
-    /// </param>
-    static bool[] Mask(List<List<(double X, double Y)>> polys, bool flipY)
-    {
-        var all = polys.SelectMany(p => p).ToList();
-        double x0 = all.Min(p => p.X), x1 = all.Max(p => p.X);
-        double y0 = all.Min(p => p.Y), y1 = all.Max(p => p.Y);
-        double w = x1 - x0, h = y1 - y0;
-        if (w < 1e-9) w = 1;
-        if (h < 1e-9) h = 1;
-
-        var np = polys.Select(f => f.Select(p => (
-            (p.X - x0) / w,
-            flipY ? 1 - (p.Y - y0) / h : (p.Y - y0) / h)).ToList()).ToList();
-
-        var m = new bool[Grid * Grid];
-        for (int gy = 0; gy < Grid; gy++)
-            for (int gx = 0; gx < Grid; gx++)
-            {
-                double px = (gx + 0.5) / Grid, py = (gy + 0.5) / Grid;
-                foreach (var f in np)
-                    if (Inside(f, px, py)) { m[gy * Grid + gx] = true; break; }
-            }
-        return m;
-    }
-
-    static bool Inside(List<(double X, double Y)> f, double x, double y)
-    {
-        bool in_ = false;
-        for (int i = 0, j = f.Count - 1; i < f.Count; j = i++)
-            if ((f[i].Y > y) != (f[j].Y > y) &&
-                x < (f[j].X - f[i].X) * (y - f[i].Y) / (f[j].Y - f[i].Y) + f[i].X)
-                in_ = !in_;
-        return in_;
-    }
-
-    static double IoU(bool[] a, bool[] b)
-    {
-        int inter = 0, uni = 0;
-        for (int i = 0; i < a.Length; i++)
-        {
-            if (a[i] && b[i]) inter++;
-            if (a[i] || b[i]) uni++;
-        }
-        return uni == 0 ? 0 : (double)inter / uni;
-    }
-
-    static List<List<(double X, double Y)>> ToPairs(List<List<Point>> polys)
-        => polys.Select(f => f.Select(p => (p.X, p.Y)).ToList()).ToList();
-
-    /// <summary>
-    /// 成品与旧实现的<b>形状重合度</b>（栅格化 IoU）必须 ≥ 0.99。
+    /// 成品（按母版开头 <c>@</c>/<c>#</c> 标记摆正后）与旧实现的<b>形状重合度</b>必须 ≥ 0.99。
     /// <para>
-    /// 这是本项目最强的一道核对：把两边都归一化到单位方框、各自栅格化成
-    /// 72×72 的覆盖掩码，再求交并比。它对「面片划分方式不同」「纸带高度
-    /// 差 2 倍」「坐标方向相反」都免疫 —— 只关心<b>最终纸张覆盖的形状</b>，
-    /// 而这正是用户看到的东西。
-    /// </para>
-    /// <para>
-    /// 曾用它一次抓出两个隐藏很深的缺陷（此前 bbox / 面积序列都查不出来）：
-    /// <list type="number">
-    /// <item>rotate 的<b>手性反了</b>：旧实现的 <c>rotatePoint</c> 作用在 y 向下的
-    /// 坐标系，本项目走「数学坐标 + flipY」，镜像会翻转旋转方向。
-    /// 实测约定 rotate=1 的字模（V/L/6）要转 3，rotate=3 的（S）要转 1
-    /// —— 即取负。修前 V 只有 0.696。</item>
-    /// <item>母版开头的 <c>|</c>（x=0 的竖折痕）被丢弃：它切出的面片宽度为零，
-    /// 平面剖分产生不出来，但那条反射线会镜像其后所有面片。修前
-    /// L 只有 0.451、68S 只有 0.640。</item>
-    /// </list>
-    /// 修后 18 个字模/词全部 ≥ 0.996。
+    /// IoU 对「面片划分方式不同」「纸带高度差 2 倍」「坐标方向相反」都免疫 ——
+    /// 只关心最终纸张覆盖的形状。标记少标、多标或算错，这里立刻掉到 0.6 以下。
     /// </para>
     /// </summary>
     [Theory]
@@ -154,46 +81,18 @@ public class LegacyLetterParityTests
     [InlineData("68S")] [InlineData("SOS")] [InlineData("SOKRENIO")]
     public void 成品形状与旧实现重合度不低于0_99(string ch)
     {
-        var (master, rot) = FoldFont.TextToMasterWithRotate(ch);
-        var m = Master.ParseMaster(master);
-        m.Rotate = rot;
-        var fm = FoldOps.FoldStrip(m, MasterOps.DefaultMv(m.Pipes.Count + m.NCell));
+        var master = Master.ParseMaster(FoldFont.TextToMaster(ch));
+        var fm = FoldOps.FoldStrip(master, MasterOps.DefaultMv(master.Pipes.Count + master.NCell));
         if (fm.World.Count == 0) return;
 
-        // 基准：单字母走 showFolded 路径，多字符走文本拼接路径
-        List<List<(double X, double Y)>>? want = null;
-        foreach (var (file, scaled) in new[] { ("legacy_letters.json", true), ("legacy_multi.json", false) })
-        {
-            string p = Path.Combine(AppContext.BaseDirectory, file);
-            if (!File.Exists(p)) continue;
-            var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(p, Encoding.UTF8));
-            if (!doc.RootElement.TryGetProperty(ch, out var el)) continue;
-
-            want = el.GetProperty("polys").EnumerateArray().Select(pa =>
-                pa.EnumerateArray().Select(q => (
-                    q.GetProperty("x").GetDouble() / (scaled ? 2 : 1),
-                    q.GetProperty("y").GetDouble() / (scaled ? 2 : 1))).ToList()).ToList();
-            break;
-        }
-        if (want is null) return;
-
-        // 基准（旧实现）已是屏幕坐标；本项目是数学坐标，要比就得先翻 y
-        double iou = IoU(Mask(want, flipY: false), Mask(ToPairs(fm.World), flipY: true));
-        Assert.True(iou >= 0.99, $"「{ch}」与旧实现的形状重合度仅 {iou:0.###}（应 ≥ 0.99）");
+        double iou = ShapeMatch.Match(fm.World, master.Marks.Canvas, ch);
+        Assert.True(iou >= 0.99,
+            $"「{ch}」与旧实现的形状重合度仅 {iou:0.###}（应 ≥ 0.99）；标记 {master.Marks.Prefix}");
     }
 
     /// <summary>
-    /// <b>方形成品</b>必须与长条成品是同一个形状（同一张纸的两种铺排）。
-    /// <para>
-    /// 方形折叠走的是「树反射」，与长条的「顺次滚动」是两条实现路径，
-    /// 但两者折叠的是<b>同一串折痕</b> —— 成品形状必须一致，否则说明
-    /// 方形这条路径有问题。这条长期缺失，导致方形成品一直没被验证：
-    /// 实测曾发现 ① 方形完全不按字模 rotate 摆正（V 折成横带子、SOS 竖排）；
-    /// ② 母版含 x=0 竖折痕时少了左右镜像（L/6/1/5/123456/68S 与长条对不上）。
-    /// </para>
-    /// <para>
-    /// 判据用栅格化 IoU（保留宽高比），对坐标系方向与面片划分方式免疫。
-    /// </para>
+    /// <b>方形成品</b>必须与长条成品是同一个形状：两条路径（树反射 / 顺次滚动）
+    /// 折的是<b>同一串折痕</b>，形状对不上就说明方形那条路有问题。
     /// </summary>
     [Theory]
     [InlineData("A")] [InlineData("B")] [InlineData("E")] [InlineData("F")]
@@ -208,62 +107,57 @@ public class LegacyLetterParityTests
     [InlineData("68S")] [InlineData("123456")] [InlineData("HELLO")]
     public void 方形成品与长条成品形状一致(string ch)
     {
-        var (masterText, rotate) = FoldFont.TextToMasterWithRotate(ch);
-        var master = Master.ParseMaster(masterText);
-        master.Rotate = rotate;
+        var master = Master.ParseMaster(FoldFont.TextToMaster(ch));
+        var mv = Model.StripModel(master).Folds.Select(f => f.MvType).ToList();
 
-        var stripModel = Model.StripModel(master);
-        var mv = stripModel.Folds.Select(f => f.MvType).ToList();
-
-        var strip = FoldOps.FoldStrip(master, mv, orient: true);
-        var plan = SquareOps.PlanFromMaster(master);
-        var square = FoldOps.FoldSquare(plan, orient: true, rotate: rotate, rotateKnown: true);
+        var strip = FoldOps.FoldStrip(master, mv);
+        var square = FoldOps.FoldSquare(SquareOps.PlanFromMaster(master));
 
         if (strip.World.Count == 0 || square.World.Count == 0) return;
 
-        double iou = IoU(Mask(ToPairs(strip.World), flipY: true),
-                         Mask(ToPairs(square.World), flipY: true));
+        // 两条路径共用同一个画布变换，比的时候也就一起摆正
+        double iou = ShapeMatch.IoU(ShapeMatch.Mask(ShapeMatch.View(strip.World, master.Marks.Canvas), false),
+                                    ShapeMatch.Mask(ShapeMatch.View(square.World, master.Marks.Canvas), false));
 
         Assert.True(iou >= 0.99,
             $"「{ch}」方形成品与长条成品形状不一致（IoU {iou:0.###}）—— 方形那条折叠路径有问题");
     }
 
     /// <summary>
-    /// 含 x=0 竖折痕的母版，其方形成品必须经过一次左右镜像。
-    /// <para>
-    /// 与长条同源：x=0 的竖折痕切出的面片宽为零，平面剖分产生不出来，
-    /// 但那条反射线会镜像其后所有面片。方形与长条用<b>同一个判据</b>
-    /// （<c>Pipes.Contains(0)</c>），否则两条路径会给出不同朝向。
-    /// </para>
+    /// 带 <c>#</c> 的字模（编码含 x=0 竖折痕）：去掉标记就应当对不上。
+    /// <para>★ 断言的是<b>去掉标记会错</b>，而不是「代码调了某个镜像函数」——
+    /// 换一种摆正实现只要结果仍对，这条就不用改。</para>
     /// </summary>
     [Theory]
-    [InlineData("G")] [InlineData("F")] [InlineData("E")] [InlineData("L")]
+    [InlineData("E")] [InlineData("F")] [InlineData("G")] [InlineData("L")]
     [InlineData("6")] [InlineData("1")] [InlineData("5")] [InlineData("68S")]
     [InlineData("123456")]
-    public void 含零号竖折痕的母版成品需要镜像(string ch)
+    public void 去掉翻转标记就与旧实现不符(string ch)
     {
-        var (masterText, rotate) = FoldFont.TextToMasterWithRotate(ch);
-        var master = Master.ParseMaster(masterText);
-        master.Rotate = rotate;
-        Assert.Contains(0, master.Pipes);
+        if (ShapeMatch.Legacy(ch) is null) return;          // 基准未覆盖，无从比较
 
-        var stripModel = Model.StripModel(master);
-        var mv = stripModel.Folds.Select(f => f.MvType).ToList();
-        var strip = FoldOps.FoldStrip(master, mv, orient: true);
-        var plan = SquareOps.PlanFromMaster(master);
+        var master = Master.ParseMaster(FoldFont.TextToMaster(ch));
+        Assert.True(master.Marks.Flip, $"「{ch}」的母版应当带 # 标记，实得 {master.Marks.Prefix}");
 
-        // 关掉镜像（把 0 号折痕抹去）后应当对不上，说明这次镜像确实在起作用
-        var planNoMirror = SquareOps.PlanFromMaster(master);
-        planNoMirror.Pipes.Remove(0);
-        var wrong = FoldOps.FoldSquare(planNoMirror, orient: true, rotate: rotate, rotateKnown: true);
+        var fm = FoldOps.FoldStrip(master, MasterOps.DefaultMv(master.Pipes.Count + master.NCell));
+        double ok = ShapeMatch.Match(fm.World, master.Marks.Canvas, ch);
 
-        double ok = IoU(Mask(ToPairs(strip.World), flipY: true),
-                        Mask(ToPairs(FoldOps.FoldSquare(plan, orient: true, rotate: rotate, rotateKnown: true).World), flipY: true));
-        double bad = IoU(Mask(ToPairs(strip.World), flipY: true),
-                         Mask(ToPairs(wrong.World), flipY: true));
+        // ★ <c>#</c> 是折痕层面的翻转，去掉它要<b>重新解析母版</b>，
+        // 而不是改画布 —— 画布上根本没有翻转这一步（翻转已经落在折痕里了）。
+        var noFlip = Master.ParseMaster(
+            new string(Master.RotateMark, master.Marks.QuarterTurns) + master.RawBody);
+        double bad = ShapeMatch.Match(
+            FoldOps.FoldStrip(noFlip, MasterOps.DefaultMv(noFlip.Pipes.Count + noFlip.NCell)).World,
+            noFlip.Marks.Canvas, ch);
 
-        Assert.True(ok >= 0.99, $"「{ch}」补镜像后仍对不上（IoU {ok:0.###}）");
-        Assert.True(bad < 0.95, $"「{ch}」不补镜像居然也对得上（IoU {bad:0.###}）—— 这条断言失去意义");
+        var bare = Master.ParseMaster(master.RawBody);
+        double bad2 = ShapeMatch.Match(
+            FoldOps.FoldStrip(bare, MasterOps.DefaultMv(bare.Pipes.Count + bare.NCell)).World,
+            bare.Marks.Canvas, ch);
+
+        Assert.True(ok >= 0.99, $"「{ch}」带标记后仍对不上（IoU {ok:0.###}）");
+        Assert.True(bad < 0.95 || bad2 < 0.95,
+            $"「{ch}」去掉标记居然也对得上（去# {bad:0.###} / 全去 {bad2:0.###}）—— 这两条断言失去意义");
     }
 
     /// <summary>多边形面积（鞋带公式），用于筛掉退化面片与做形状指纹。</summary>
@@ -303,9 +197,7 @@ public class LegacyLetterParityTests
     {
         if (!Legacy.TryGetValue(ch, out var want)) return;
 
-        var (master, rot) = FoldFont.TextToMasterWithRotate(ch);
-        var m = Master.ParseMaster(master);
-        m.Rotate = rot;
+        var m = Master.ParseMaster(FoldFont.TextToMaster(ch));
         var fm = FoldOps.FoldStrip(m, MasterOps.DefaultMv(m.Pipes.Count + m.NCell));
 
         int wantCount = want.Polys.Count(p => Area(p) > 1e-9);
@@ -335,9 +227,7 @@ public class LegacyLetterParityTests
     {
         if (!Legacy.TryGetValue(ch, out var want)) return;
 
-        var (master, rot) = FoldFont.TextToMasterWithRotate(ch);
-        var m = Master.ParseMaster(master);
-        m.Rotate = rot;
+        var m = Master.ParseMaster(FoldFont.TextToMaster(ch));
         var fm = FoldOps.FoldStrip(m, MasterOps.DefaultMv(m.Pipes.Count + m.NCell));
 
         var wantSeq = want.Polys.Select(Area).Where(a => a > 1e-9).ToList();
@@ -354,8 +244,8 @@ public class LegacyLetterParityTests
     /// 单字母成品的<b>长宽比</b>必须与旧实现一致 —— 归一化后即
     /// 「宽 &gt;= 高」的横向还是「宽 &lt; 高」的纵向。
     /// <para>
-    /// 旧实现所有字母都是 <b>6×10 竖立</b>（沿用 stripHeight=50 的长条习惯）。
-    /// 本项目此前横躺，说明<b>成品朝向反了</b>，不是形状错了。
+    /// 旧实现所有字母都是 <b>6×10 竖立</b>。本项目靠母版开头的 <c>@</c> 转到位 ——
+    /// 标记少转一格这里立刻露馅：IoU 会把宽高各自归一化，看不出相差 90° 的旋转。
     /// </para>
     /// </summary>
     [Theory]
@@ -366,12 +256,10 @@ public class LegacyLetterParityTests
     {
         if (!Legacy.TryGetValue(ch, out var want)) return;
 
-        var (master, rot) = FoldFont.TextToMasterWithRotate(ch);
-        var m = Master.ParseMaster(master);
-        m.Rotate = rot;
+        var m = Master.ParseMaster(FoldFont.TextToMaster(ch));
         var fm = FoldOps.FoldStrip(m, MasterOps.DefaultMv(m.Pipes.Count + m.NCell));
 
-        var ours = fm.World.Select(p => p.Select(q => (q.X, q.Y)).ToList()).ToList();
+        var ours = ShapeMatch.View(fm.World, m.Marks.Canvas);
         var (ax, ay, bx, by) = Norm(want.Polys);
         var (cx, cy, dx, dy) = Norm(ours);
 
@@ -394,13 +282,11 @@ public class LegacyLetterParityTests
 
         foreach (var (ch, want) in Legacy)
         {
-            var (master, rot) = FoldFont.TextToMasterWithRotate(ch);
-            var m = Master.ParseMaster(master);
-            m.Rotate = rot;
+            var m = Master.ParseMaster(FoldFont.TextToMaster(ch));
             var fm = FoldOps.FoldStrip(m, MasterOps.DefaultMv(m.Pipes.Count + m.NCell));
             if (fm.World.Count == 0) continue;
 
-            var ours = fm.World.Select(p => p.Select(q => (q.X, q.Y)).ToList()).ToList();
+            var ours = ShapeMatch.View(fm.World, m.Marks.Canvas);
             var (ax, ay, bx, by) = Norm(want.Polys);
             var (cx, cy, dx, dy) = Norm(ours);
 

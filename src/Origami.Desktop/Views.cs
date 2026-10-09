@@ -84,6 +84,9 @@ public static class Views
     public static ViewInfo Resolve(ShapeKind shape, ContentKind content)
         => All.First(v => v.Shape == shape && v.Content == content);
 
+    /// <summary>按视图种类取它的元信息。</summary>
+    public static ViewInfo Info(ViewKind kind) => All.First(v => v.Kind == kind);
+
     /// <summary>
     /// 由母版产出全流程的中间结果。<b>只算一次</b>，所有视图从这里取 —— 否则每切一次
     /// 标签页就要重跑铺排与折叠，交互会明显发涩。
@@ -102,15 +105,12 @@ public static class Views
         public required FoldedModel SquareFolded { get; init; }
 
         /// <summary>
-        /// 文本生成时系统算出的<b>摆正变换</b>（来自字模的 rotate 约定）。
+        /// 母版<b>自带的</b>摆正变换（来自开头的 <c>@</c>/<c>#</c> 标记）。
         /// <para>
-        /// ★ 它<b>不烘焙进几何</b>：几何一律保持「原始方向」，摆正作为画布变换
-        /// 交给右下角的翻转按钮体现。这样用户看到的朝向 = 自动摆正 + 自己叠加的调整，
-        /// 「恢复原始方向」也才真的能回到未摆正的原始朝向。
-        /// </para>
-        /// <para>
-        /// 手工输入的母版串没有编码来源 -> <see cref="CanvasTransform.Identity"/>，
-        /// 由 <c>OrientLandscape</c> 的等价物直接作用在几何上。
+        /// ★ <b>不烘焙进几何</b>：几何停在原始方向，摆正体现在右下角的翻转按钮上，
+        /// 用户才能在它之上继续调整、「恢复原始方向」也才回得去。
+        /// 信息只认母版串（可导出、可保存、可粘贴的唯一事实来源），
+        /// 不带标记就是 <see cref="CanvasTransform.Identity"/>。
         /// </para>
         /// </summary>
         public CanvasTransform AutoXform { get; init; } = CanvasTransform.Identity;
@@ -123,19 +123,9 @@ public static class Views
     /// 顺次滚动（长条母版的意图）与树反射（KRENIO / PROTEIN 拼出字母的那条路）。
     /// </para>
     /// </summary>
-    /// <param name="rotate">
-    /// 成品该转多少个 90°（来自字模编码的 <c>@</c> 计数，由第一个字母决定）。
-    /// 传0 表示信息未知，<see cref="FoldOps.FoldStrip"/> 会退回按 bbox 猜朝向。
-    /// </param>
-    /// <param name="rotateKnown">
-    /// <paramref name="rotate"/> 是否真有来源（文本生成才有）。
-    /// 手工输入的母版串传 <c>false</c>，折叠层才会退回按 bbox 猜朝向。
-    /// </param>
-    public static Document Build(string masterText, int rotate = 0, bool rotateKnown = true)
+    public static Document Build(string masterText)
     {
         var master = Master.ParseMaster(masterText);
-        // 只在有来源时赋值 —— Rotate 的 setter 本身就是「来源标记」
-        if (rotateKnown) master.Rotate = rotate;
         var strip = Model.StripModel(master);
         var plan = SquareOps.PlanFromMaster(master);
         var square = Model.SquareModel(plan);
@@ -145,14 +135,8 @@ public static class Views
         // ★ 两条路径都产出<b>原始方向</b>，不在这里旋转 —— 摆正改由画布变换承担
         // （见 AutoXform 的说明）。长条与方形的坐标系现已统一为数学坐标（y 向上），
         // 所以同一个画布旋转对两者都成立，切换视图时方向不会跳。
-        var stripFolded = FoldOps.FoldStrip(master, mv, orient: false);
-        var squareFolded = FoldOps.FoldSquare(plan, orient: false);
-        // 几何里摆正用的是 Rotate90(4 - rotate)（数学坐标、逆时针），而画布变换的
-        // QuarterTurns 是<b>顺时针</b>次数；渲染层还要把数学坐标 flipY 成屏幕坐标，
-        // 而 flipY 会翻转旋转手性 —— 两次翻转相抵，落到画布上恰好就是 rotate 本身。
-        var autoXform = master.RotateKnown
-            ? CanvasTransform.Create(rotate % 4)
-            : CanvasTransform.Identity;
+        var stripFolded = FoldOps.FoldStrip(master, mv);
+        var squareFolded = FoldOps.FoldSquare(plan);
 
         return new Document
         {
@@ -162,7 +146,7 @@ public static class Views
             Square = square,
             StripFolded = stripFolded,
             SquareFolded = squareFolded,
-            AutoXform = autoXform,
+            AutoXform = master.Marks.Canvas,
         };
     }
 
@@ -221,9 +205,22 @@ public static class Views
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "未知视图"),
         };
 
-        // 方向变换放在最后统一施加：六条生成路径完全不用关心它
-        return SvgTransform.Apply(svg, xform);
+        // ★ 母版摆正只作用于<b>成品与原子片</b>。折痕图（长条/方形）完全不参与方向：
+        // 折痕是数据，转过来看就没法与母版串逐格对照，界面也索性不显示方向面板。
+        // 母版的标记仍写进 SVG（<c>data-marks</c>），导出后再读回来还是同一份母版。
+        if (Info(kind).Content == ContentKind.Crease)
+            return SvgTransform.Stamp(svg, SvgMarks(doc));
+
+        // 先母版摆正、再用户调整。<b>分两步套</b>而不是合成一个变换：
+        // CanvasTransform 的 90° 是绕「旋转后画布的中心」定义的，
+        // 这 16 种组合<b>对复合不封闭</b> —— 「先转再镜像」与「先镜像再转」
+        // 落在不同的地方，合成一个就会平移错位。嵌套两层 <g> 则天然正确。
+        return SvgTransform.Apply(SvgTransform.Apply(svg, doc.AutoXform), xform);
     }
+
+    /// <summary>母版自带的方向标记原文（折痕图 SVG 里记作 <c>data-marks</c>）。</summary>
+    public static string SvgMarks(Document doc)
+        => doc.MasterText.Length == 0 ? "" : Master.ParseMaster(doc.MasterText).Marks.Prefix;
 
     /// <summary>把某个视图渲染成 <b>PNG 字节</b>，用于导出。</summary>
     /// <param name="scale">
@@ -262,7 +259,9 @@ public static class Views
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "未知视图"),
         };
 
-        // 方向变换放在最后统一施加，与 SVG 侧完全对称
+        // 方向变换放在最后统一施加，与 SVG 侧完全对称（同样分两步，不合成一个）。
+        // 折痕图只认用户调整 —— PNG 也无处记标记，但折痕本来也不需要摆正。
+        if (Info(kind).Content != ContentKind.Crease) r.Transform(doc.AutoXform);
         r.Transform(xform);
         return r.ToPngBytes();
 

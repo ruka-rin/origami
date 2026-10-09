@@ -22,7 +22,7 @@
     <SolidColorBrush x:Key="Bgc.Panel" Color="#1C1C22" />
     <SolidColorBrush x:Key="Bgc.Chrome" Color="#1E1E24" />
     <SolidColorBrush x:Key="Bgc.Sunken" Color="#1A1A1F" />
-    <SolidColorBrush x:Key="Bgc.Hover" Color="#26262E" />
+    <SolidColorBrush x:Key="Bgc.Hover" Color="#36363E" />
     <SolidColorBrush x:Key="Bgc.HelpHover" Color="#555555" />
     <SolidColorBrush x:Key="Bgc.Scrim" Color="#C016161A" />
 

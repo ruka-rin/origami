@@ -67,20 +67,10 @@ public sealed class FoldedModel
     }
 
     /// <summary>
-    /// 把成品转成<b>横向可读</b>（宽 &gt;= 高）。
-    /// 成品落在哪个朝向取决于母版第 0 格的折痕方向，两种都合法，统一在这里摆正。
-    /// <para>
-    /// ★ 问题出在<b>bbox 恰好是正方形</b>的情形。沿 45° 对角延伸的纸带
-    /// （母版是若干个 <c>\</c> 时正是如此）的 bbox 是 N×N：
-    /// 奇数格是真方形，偶数格是纵向，于是 <c>width &gt;= height</c> 在奇数格判「已横向」
-    /// 而放弃旋转、偶数格判「竖直」而旋转 —— <b>隔一个跳一次</b>，
-    /// 视觉上就是斜线方向反复变。
-    /// </para>
-    /// <para>
-    /// 修法：正方形不是「已横向」的证据。正方形时统一<b>旋转</b>，
-    /// 让朝向在整个区间上连续；非正方形时仍按宽高比判断。
-    /// 这样奇偶格的处理一致，斜线方向不再跳变。
-    /// </para>
+    /// 把成品转成横向（宽 &gt;= 高）—— 只给<b>没有方向信息</b>的成品兜底
+    /// （如从 JSON 模型反向推导出来的）。带标记的一切都交给画布。
+    /// <para>★ 判据不是简单的「宽 &gt;= 高」：45° 对角纸带的 bbox 恰好是正方形，
+    /// 会在奇偶格之间隔一个跳一次；正方形统一按「该转」处理才稳。</para>
     /// </summary>
     public FoldedModel OrientLandscape()
     {
@@ -89,20 +79,13 @@ public sealed class FoldedModel
         const double eps = 1e-9;
 
         bool square = Math.Abs(w - h) <= eps;
-
-        // 明确的宽 < 高：竖向，该转。
-        // 明确的宽 > 高：横向，不转。
-        // 恰好正方形：方向定不下来（对角带的巧合），**统一旋转**，
-        // 与相邻格数保持一致 —— 这是本函数存在的意义（摆正），
-        // 两种朝向本就都合法，不该在退化点上来回摇摆。
-        bool needsRotate = square ? true : (w < h);
+        bool needsRotate = square || w < h;
 
         if (!needsRotate) return this;
 
         var cand = Rotate90(1);
         var (a0, b0, a1, b1) = cand.Bbox();
-        // 转完未必更横向，只在确实变宽时采用。
-        // 正方形时两者相等，故一律采用（避免又出现「两个答案」的分支）。
+        // 转完未必更横向，只在确实变宽时采用；正方形时两者相等，一律采用。
         return (square || (a1 - a0) > (b1 - b0)) ? cand : this;
     }
 
@@ -118,8 +101,8 @@ public sealed class FoldedModel
     /// 关于<b>水平</b>中心轴镜像（即上下翻转）。
     /// <para>
     /// 用来把方形折叠的<b>屏幕坐标</b>（y 向下）转成与长条一致的<b>数学坐标</b>
-    /// （y 向上）。两条路径的坐标系统一后，「摆正」才能共用同一套画布变换 ——
-    /// 否则同一个 rotate 约定在两种坐标里旋转手性相反，会各转各的。
+    /// （y 向上）。两条路径的坐标系统一后，摆正才能共用<b>同一个</b>画布变换 ——
+    /// 否则同一份方向标记在两种坐标里旋转手性相反，会各转各的。
     /// </para>
     /// </summary>
     public FoldedModel MirrorAboutX()
@@ -170,67 +153,6 @@ public sealed class FoldedModel
         var tail = World.Skip(World.Count - q).SelectMany(f => f);
         return head.Average(p => p.X) < tail.Average(p => p.X);
     }
-
-    /// <param name="rotate">母版声明的旋转次数（<see cref="Master.Rotate"/>，0..3）。</param>
-    /// <summary>
-    /// 把成品摆成<b>统一的书写朝向</b>：横向，且<b>首字在左</b>。
-    /// <para>
-    /// 光靠 <see cref="Master.Rotate"/>（90° 旋转）不够：rotate=1 的字模
-    /// （6 8 J L O Q U V W）转完后 bbox 与 rotate=0 同样大小，
-    /// 却<b>左右翻转</b> —— 视觉上是两个不同的字。这就是「除了转向还有翻面」。
-    /// </para>
-    /// <para>
-    /// 判据用<b>书写方向</b>这个几何事实：折纸链沿 x 推进，成品上链首与链尾
-    /// 在长轴上的相对位置就标出了书写方向。不对就镜像一次。
-    /// </para>
-    /// <para>
-    /// ★ 判据不能换成「首格折痕是 / 还是 \」—— 实测二者<b>并无</b>对应关系：
-    /// 首格同为 '/' 的 A 与 M 方向相反，首格为 '\' 的 S 反而是正的。
-    /// 首格折痕只是<b>相关</b>，书写方向才是<b>因果</b>。
-    /// </para>
-    /// </summary>
-    /// <summary>
-    /// 成品摆正：<b>按字模的 rotate 约定旋转，再归位到第一象限</b>。
-    /// <para>
-    /// rotate 是字模自带的属性（编码里 <c>@</c> 的个数），它决定字母
-    /// <b>本身的站立方向</b>。实测（格为单位）：
-    /// <list type="bullet">
-    /// <item><b>A</b> rotate=0：折叠结果 3×5，与旧实现 6×10（半格）吻合，无需旋转</item>
-    /// <item><b>V</b> rotate=1：折叠结果 5×3，旋转 90° 后 3×5 = 旧实现的 6×10</item>
-    /// <item><b>L</b> rotate=1：同上</item>
-    /// </list>
-    /// 多字母文本（KRENIO/PROTEIN/SOS）的首字母 rotate 决定整行朝向，
-    /// 旧实现的 bbox 也是横向的（如 SOS 22×10 半格 = 11×5 格）。
-    /// </para>
-    /// <para>
-    /// ★ 曾一度撤掉这里的旋转，理由是「渲染出的 SOS 上下颠倒」——
-    /// 但当时母版还缺了首尾两块空白片（见 <c>CreasesToMaster</c>），
-    /// 形状本身就是错的，那个判断不成立。<b>先修数据，再判方向。</b>
-    /// </para>
-    /// <para>
-    /// ★ <b>旋转量取负</b>（<c>Rotate90(4 - rotate)</c>）。旧实现的
-    /// <c>rotatePoint</c> 是 <c>(x,y) → (-y,x)</c>，作用在它自己的坐标系上；
-    /// 本项目走「数学坐标（y 向上）+ 渲染层 flipY」两条腿，而 flipY 本身
-    /// 是一次镜像 —— 镜像会翻转旋转的手性，所以同一个约定值在本项目里
-    /// 要按<b>相反方向</b>转才能落到同样的视觉朝向。
-    /// </para>
-    /// <para>
-    /// 实测（把成品栅格化成 72×72 掩码后与旧实现求 IoU，1.0 为完全重合）：
-    /// <code>
-    /// 约定 rotate :  0     1     2     3
-    /// 应取 rotate :  0     3     2     1
-    /// 该 rotate 下 :  0.996 0.997 1.000 0.998   (X/M/A/E/F/G/…)
-    /// </code>
-    /// 18 个字模/词在正确 rotate 下 IoU 全部 ≥ 0.996
-    /// （V 0.998、L 1.000、6 0.998、68S 0.997、S 0.998、SOS 0.998、KRENIO 0.997）。
-    /// </para>
-    /// <para>
-    /// <b>归位</b>不可省：<c>Rotate90</c> 绕原点转会把顶点甩到负半轴，
-    /// 渲染层的 <c>flipY</c>（<c>Sy = y1 - p.Y</c>）要求规整的 bbox。
-    /// </para>
-    /// </summary>
-    public FoldedModel OrientWriting(int rotate)
-        => Rotate90((4 - rotate % 4) % 4).Normalize();
 
     public double AreaFlat() => FacesFlat.Sum(Geom.PolyArea);
 
@@ -516,69 +438,36 @@ public static class FoldOps
         return rank;
     }
 
-    /// <summary>方形 CP -&gt; <see cref="FoldedModel"/>（树反射）。</summary>
-    public static FoldedModel FoldSquare(SquarePlan plan, bool orient = true,
-                                         int rotate = 0, bool rotateKnown = false,
-                                         int? rootIdx = null)
+    /// <summary>
+    /// 方形 CP -&gt; <see cref="FoldedModel"/>（树反射）。产出<b>原始朝向</b>，
+    /// 摆正由母版开头的 <c>@</c>/<c>#</c> 标记驱动画布完成 ——
+    /// 与长条共用同一个变换，切视图时朝向不会跳。
+    /// </summary>
+    public static FoldedModel FoldSquare(SquarePlan plan, int? rootIdx = null)
     {
         var (world, mv, depth, _, faces) = SquareFold(plan, rootIdx);
-
-        // ★ 与长条同一个物理含义：母版含 0 号竖折痕（x=0）时，成品要左右镜像一次
-        // （详见 FoldStrip 里的同名处理）。方形与长条的差别只有两点：
-        //   ① 方形是屏幕坐标（y 向下），长条是数学坐标（y 向上）；
-        //   ② 图形由树反射而非顺次滚动得到。
-        // 实测（与长条成品求栅格化 IoU，1.0 为完全重合）：
-        //   补镜像 + Rotate90(rotate)   -> 18 个字模/词里 17 个达到 1.0
-        //   不补镜像                    -> G/F/L/6/1/5/123456/68S 只有 0.1~0.6
-        //   用 Rotate90(4-rotate)（长条的那套）-> L/6/SOS/S 反过来错
-        // 原因同长条的「取负」：两套坐标系互为镜像，旋转手性相反 —— 长条取负、
-        // 方形不取负，落到屏幕上才是同一个朝向。
-        if (plan.Pipes.Contains(0))
-            world = world.Select(f => f.Select(p => new Point(-p.X, p.Y)).ToList()).ToList();
 
         var rank = SquareLayerOrder(world.Count, mv, depth, faces);
         var creases = plan.Fold.Select(s => EdgeKey(s.A, s.B)).OrderBy(s => s.A).ThenBy(s => s.B).ToList();
         var fm = new FoldedModel(world, rank, mv, world, creases,
             new List<(List<int>, int)> { (Enumerable.Range(0, world.Count).ToList(), 0) });
 
-        // ★ 统一到<b>数学坐标</b>（y 向上），与长条一致。
-        // 这样「摆正」能共用长条那套 OrientWriting，同一个 rotate 约定在两条路径
-        // 上含义相同（此前方形是屏幕坐标、旋转手性相反，只能各写一套规则）。
+        // 统一到<b>数学坐标</b>（y 向上），与长条一致：方形是屏幕坐标（y 向下），
+        // 不翻过来两条路径的旋转手性会相反，只能各写一套规则，极易走偏。
         // 渲染层随之对方形也做 flipY —— 用户要的「通用渲染」正是这个意思。
-        fm = fm.MirrorAboutX();
-
-        if (!orient) return fm;
-        if (rotateKnown) return fm.OrientWriting(rotate);
-        return fm.OrientLandscape();
+        return fm.MirrorAboutX();
     }
 
-    /// <summary>长条母版 -&gt; <see cref="FoldedModel"/>（一张连续的纸，链式顺次折）。</summary>
+    /// <summary>
+    /// 长条母版 -&gt; <see cref="FoldedModel"/>（一张连续的纸，链式顺次折）。
+    /// 产出<b>原始朝向</b>，摆正交给画布（见 <see cref="FoldSquare"/>）。
+    /// </summary>
     /// <param name="mv">峰谷序列，长度须等于折痕数。</param>
-    /// <param name="orient">
-    /// 是否摆正成品。
-    /// <para>
-    /// 优先用 <see cref="Master.Rotate"/>（来自字模编码的 <c>@</c> 计数，
-    /// 由第一个字母决定）—— 旧实现就是这么「一次到位」的。
-    /// 该信息缺失时（手工输入的母版串没有编码来源）才退回
-    /// <see cref="OrientLandscape"/> 按 bbox 猜。
-    /// </para>
-    /// </param>
-    public static FoldedModel FoldStrip(Master master, IReadOnlyList<string> mv, bool orient = true)
+    public static FoldedModel FoldStrip(Master master, IReadOnlyList<string> mv)
     {
         var (faces, creases, _) = MasterOps.ChainFromMaster(master);
         var (world, _) = RollFold(faces, creases);
         var rank = LayerRanks(faces.Count, creases, mv);
-
-        // ★ 母版以 `|` 开头（<c>Pipes</c> 含 0）表示纸带起点端有一道竖折痕。
-        // 它切出的面片宽度为零，平面剖分产生不出这种退化面片，但<b>那条反射线
-        // 是真实的</b>：旧实现会对每个面片依次反射之前所有折痕，其中就包含它，
-        // 效果等于把整个成品沿 x=0 左右翻转（矩阵上是最外层的一次 Reflect）。
-        // 少了这一次镜像，L / 68S 的形状就与旧实现不符。
-        //
-        // 必须补在<b>最外层</b>（rotate 之前 —— 本函数在 OrientWriting 前调用，
-        // 故此处正好），因为旧实现里 x=0 折痕是所有面片共有的最外一层。
-        if (master.Pipes.Contains(0))
-            world = world.Select(f => f.Select(p => new Point(-p.X, p.Y)).ToList()).ToList();
 
         // 必须同时给出 MvMap 与 MvSeq：渲染层优先读 MvMap（按面下标取），
         // 只给 MvSeq 的话 MvMap 是空的，着色会被静默跳过（成品一片空白）。
@@ -586,20 +475,7 @@ public static class FoldOps
         for (int i = 0; i < creases.Count && i < mv.Count; i++)
             mvMap[CreaseOwner(creases[i], faces)] = mv[i];
 
-        var fm = new FoldedModel(world, rank, mvMap, mv.ToList(), faces, creases);
-        if (!orient) return fm;
-
-        // ★ 判据是「rotate 有没有来源」，不是「rotate 是否非零」。
-        // 曾经写成 `master.Rotate > 0`，于是 rotate=0 的整组字模
-        // （A K M N P R T X Y Z …）被当成「没有 rotate 信息」而走 bbox 猜法，
-        // 把本来竖立的成品（A 折叠结果 3×5，与旧实现吻合）
-        // 强行转成横向 5×3 —— 字母全部躺倒。
-        //
-        // 有编码来源（文本生成）-> 用字模的 rotate 约定，即便它是 0
-        if (master.RotateKnown) return fm.OrientWriting(master.Rotate);
-
-        // 手工输入的母版串没有编码来源 -> 退回按 bbox 猜
-        return fm.OrientLandscape();
+        return new FoldedModel(world, rank, mvMap, mv.ToList(), faces, creases);
     }
 
     /// <summary>找出这条折痕所归属的面（拿它当着色字典的键）。</summary>
